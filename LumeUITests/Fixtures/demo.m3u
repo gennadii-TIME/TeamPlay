@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="demo.bipbop" group-title="Demo",Bip Bop HLS
+https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/v9/prog_index.m3u8
