@@ -1,59 +1,41 @@
 # TeamPlay
 
-IPTV player for **Apple TV**, based on the full [Lume](https://github.com/bilipp/Lume) codebase (AGPL-3.0), with TeamPlay branding.
+IPTV for **Apple TV, iPhone, iPad, Mac, and Vision Pro** — based on the full
+[Lume](https://github.com/bilipp/Lume) codebase (AGPL-3.0), with TeamPlay branding.
 
-Canonical product plan: [`docs/PRODUCT_PLAN.md`](docs/PRODUCT_PLAN.md).
+Plan: [`docs/PRODUCT_PLAN.md`](docs/PRODUCT_PLAN.md).
 
-> **PR #4** (parser-only prototype) is **not** this approach and must **not** be merged. This branch vendors Lume + LumeEngine as the real foundation.
+> **PR #4** (single borrowed M3U parser) does **not** satisfy the plan and must
+> **not** be merged. This branch vendors Lume + LumeEngine for **all five**
+> platforms in the first PR.
 
-## Build requirements (required change vs early drafts)
+## Requirements
 
-| Tool / platform | Required |
+| | |
 |---|---|
-| **Xcode** | **26.4 or later** (iOS 26 SDK) |
-| **tvOS deployment** | **18.0+** |
-| **iOS / iPadOS** | 18.0+ |
-| **macOS** | 15.0+ |
-| Disk for SPM | Plan ~6+ GB for KSPlayer/VLCKit package clones |
+| Xcode | **26.4+** |
+| tvOS / iOS / iPadOS | **18.0+** |
+| macOS | **15.0+** |
+| visionOS | **2.0+** |
 
-Do **not** use Xcode 16 / tvOS 17 targets with this tree — upstream Lume does not support them.
+Pinned commits: `docs/LUME_UPSTREAM_COMMIT.txt`, `docs/LUMEENGINE_UPSTREAM_COMMIT.txt`.  
+Details: [`docs/BUILD_REQUIREMENTS.md`](docs/BUILD_REQUIREMENTS.md).
 
-Pinned upstream commits: see [`docs/LUME_UPSTREAM_COMMIT.txt`](docs/LUME_UPSTREAM_COMMIT.txt) and [`docs/LUMEENGINE_UPSTREAM_COMMIT.txt`](docs/LUMEENGINE_UPSTREAM_COMMIT.txt). Details: [`docs/BUILD_REQUIREMENTS.md`](docs/BUILD_REQUIREMENTS.md).
-
-## Open & run (Mac)
+## Run (Mac)
 
 ```bash
-# LumeEngine is vendored at ./LumeEngine (local SPM path in the Xcode project)
-open Lume.xcodeproj
+open Lume.xcodeproj   # scheme Lume → display name TeamPlay
+./Scripts/build-all-platforms.sh
 ```
 
-1. Scheme **Lume** (product display name **TeamPlay**)
-2. Destination: **Apple TV** / Apple TV 4K Simulator (tvOS 18+)
-3. Build & run (`⌘R`)
-4. Add your own M3U / Xtream credentials (no bundled content)
+Add your own M3U/Xtream source after launch — no bundled channels.
 
-Shared SPM cache (recommended):
+## Kept from Lume
 
-```bash
-xcodebuild build \
-  -project Lume.xcodeproj -scheme Lume \
-  -destination 'platform=tvOS Simulator,name=Apple TV 4K' \
-  -clonedSourcePackagesDirPath ~/Library/Developer/Lume-SharedSPM
-```
-
-## What this PR keeps from Lume
-
-- Playlist import / sync (M3U, Xtream, and other sources Lume supports)
-- Playback engines (KSPlayer → VLCKit → AVPlayer → LumeEngine)
-- tvOS navigation, Live TV, EPG, and archive/catch-up where the source supports them
-
-## Branding (first pass)
-
-- Display name / About: **TeamPlay**
-- Bundle ID: `time.teamplay.app`
-- Source / license links point at this repository (AGPL)
-- UI/UX customization continues in follow-up PRs — do not copy Lume’s look 1:1 long-term
+Playlist sync, playback engines (KSPlayer / VLCKit / AVPlayer / LumeEngine),
+platform-adaptive UI, EPG and archive/catch-up where the source supports them.
 
 ## License
 
-AGPL-3.0. TeamPlay includes Lume and LumeEngine; corresponding source must remain available under AGPL. See [`NOTICE`](NOTICE).
+AGPL-3.0 — see [`NOTICE`](NOTICE). Paid App Store distribution still requires
+corresponding source under AGPL.

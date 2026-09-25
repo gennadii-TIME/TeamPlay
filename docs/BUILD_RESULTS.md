@@ -1,49 +1,45 @@
-# Build results
+# Build results — multi-platform matrix
 
-## Environment (this Cloud agent)
+## Cloud agent (this run)
 
 | Item | Value |
 |---|---|
-| Host OS | Linux (Cursor Cloud) |
-| Xcode | **Not installed** |
-| tvOS Simulator | **Unavailable** |
+| Host | Linux Cursor Cloud |
+| Xcode / Simulators | **Unavailable** |
 | Date | 2026-09-25 |
 
-## Upstream pins used in this PR
+Private Mac worker `MacBook-Air-M5` was online but registered only for
+`gennadii-TIME/juplite`, not TeamPlay — not usable for this repo’s `xcodebuild`.
 
-See `LUME_UPSTREAM_COMMIT.txt` and `LUMEENGINE_UPSTREAM_COMMIT.txt`.
+## Upstream pins
 
-## Mac verification
+See `LUME_UPSTREAM_COMMIT.txt` / `LUMEENGINE_UPSTREAM_COMMIT.txt`.
 
-**Pending** on a Mac with **Xcode 26.4+** and **tvOS 18** Simulator.
+## Xcode project platforms (from `Lume.xcodeproj`)
 
-A Cursor private worker was visible (`MacBook-Air-M5`) but registered only for
-`gennadii-TIME/juplite`, not TeamPlay — this agent could not target it for an
-`xcodebuild` of this repository.
+`SUPPORTED_PLATFORMS = appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator`  
+`TARGETED_DEVICE_FAMILY = 1,2,3,7`  
+Deployment: iOS 18 / tvOS 18 / macOS 15 / visionOS 2 — matches PRODUCT_PLAN.
 
-### Required Mac commands (for the reviewer / next Mac run)
+## Mac verification checklist (reviewer or Mac worker)
 
-```bash
-# 1) Confirm toolchain
-xcodebuild -version
-xcrun simctl list devices available | grep -i 'apple tv'
+Run `Scripts/build-all-platforms.sh` then manual playback on each destination.
 
-# 2) Build TeamPlay (Lume scheme, TeamPlay display name)
-xcodebuild build \
-  -project Lume.xcodeproj -scheme Lume \
-  -destination 'platform=tvOS Simulator,name=Apple TV 4K' \
-  -clonedSourcePackagesDirPath ~/Library/Developer/Lume-SharedSPM \
-  -derivedDataPath /tmp/teamplay-dd
+| Platform | Build | Add M3U | Play | Screenshot |
+|---|---|---|---|---|
+| Apple TV (tvOS 18) | ☐ | ☐ | ☐ (+ zap / back) | ☐ |
+| iPhone (iOS 18) | ☐ | ☐ | ☐ | ☐ |
+| iPad (iPadOS 18) | ☐ | ☐ | ☐ | ☐ |
+| Mac (macOS 15) | ☐ | ☐ | ☐ | ☐ |
+| Vision Pro (visionOS 2) | ☐ | ☐ | ☐ | ☐ |
 
-# 3) Boot Simulator, run, screenshot About + Live TV + Player
-```
+Paste `xcodebuild -version`, log tails from `docs/build-logs/`, and screenshot
+paths below when complete.
 
-Paste logs and screenshot paths below when complete.
+### Logs / screenshots
 
-### Results
+_Pending Mac run._
 
-- [ ] Upstream Lume builds on Apple TV Simulator
-- [ ] TeamPlay (this tree) builds on Apple TV Simulator
-- [ ] About shows TeamPlay
-- [ ] User M3U → play → zap → back to catalog demonstrated
-- [ ] Screenshots attached to PR
+## PR #4
+
+Draft PR #4 remains a parser-only prototype and **must not be merged**.

@@ -1,37 +1,62 @@
-# Build requirements — Lume-based TeamPlay
+# Build requirements — Lume-based TeamPlay (all Apple platforms)
+
+First PR scope (PRODUCT_PLAN): **one** Lume-based tree that builds for
+
+| Platform | Deployment | Device family |
+|---|---|---|
+| Apple TV | **tvOS 18.0+** | 3 |
+| iPhone / iPad | **iOS / iPadOS 18.0+** | 1, 2 |
+| Mac | **macOS 15.0+** | — |
+| Vision Pro | **visionOS 2.0+** | 7 |
+
+## Toolchain
+
+| Tool | Required |
+|---|---|
+| **Xcode** | **26.4 or later** (iOS 26 SDK) |
+| Disk for SPM | ~6+ GB shared clone recommended (`~/Library/Developer/Lume-SharedSPM`) |
+
+Do **not** claim Xcode 16 / tvOS 17 for this tree.
 
 ## Upstream pins
 
-| Component | Repository | Commit |
-|---|---|---|
-| Lume | https://github.com/bilipp/Lume | see `LUME_UPSTREAM_COMMIT.txt` |
-| LumeEngine | https://github.com/bilipp/LumeEngine | see `LUMEENGINE_UPSTREAM_COMMIT.txt` |
+| Component | File |
+|---|---|
+| Lume | `docs/LUME_UPSTREAM_COMMIT.txt` |
+| LumeEngine | `docs/LUMEENGINE_UPSTREAM_COMMIT.txt` |
 
-Vendored into this repository:
+Engine is vendored at `./LumeEngine` (Xcode local package path).
 
-- App + Xcode project at repo root (`Lume/`, `Lume.xcodeproj`, …)
-- Engine as local SPM package `./LumeEngine` (project path updated from upstream `../LumeEngine`)
+## Multi-platform build (Mac)
 
-## Why Xcode 26.4+ / tvOS 18 (not 16 / 17)
+```bash
+chmod +x Scripts/build-all-platforms.sh
+./Scripts/build-all-platforms.sh
+```
 
-Upstream Lume documents:
+Or per destination with scheme `Lume` (display name **TeamPlay**):
 
-- **Xcode 26.4** or later
-- **tvOS 18.0** deployment target (also iOS 18+, macOS 15+)
-- Built with the **iOS 26 SDK**; Liquid Glass / iOS 26 navigation where available
-- Automated tests target **iOS 26.4+ Simulator** (not tvOS)
+```bash
+SPM=(-clonedSourcePackagesDirPath ~/Library/Developer/Lume-SharedSPM)
+DD=(-derivedDataPath /tmp/teamplay-dd)
 
-Early TeamPlay drafts that declared tvOS 17 / Xcode 16 are **invalid** for this Lume-based tree. Cursor must not reintroduce those lower targets without an explicit, tested fork of Lume’s platform requirements.
+xcodebuild build -project Lume.xcodeproj -scheme Lume "${SPM[@]}" "${DD[@]}" \
+  -destination 'platform=tvOS Simulator,name=Apple TV 4K'
+# …repeat for iPhone, iPad, macOS, visionOS Simulator
+```
 
-## Build verification checklist (Mac)
+## Acceptance for PR #1 (platform matrix)
 
-1. Install Xcode 26.4+ and a tvOS 18 simulator runtime.
-2. `open Lume.xcodeproj` → scheme `Lume` → Apple TV 4K (tvOS 18).
-3. Optional: first build original upstream Lume (sibling `LumeEngine`) for comparison, then this TeamPlay tree.
-4. Confirm launch screen / home and **Settings → About** shows **TeamPlay**.
-5. Add a user M3U URL → browse groups → play a channel → zap with the Siri Remote → return to catalog.
-6. Capture Simulator screenshots for the PR.
+For **each** of tvOS, iPhone, iPad, Mac, Vision Pro:
 
-## Cloud agent note
+1. App builds and launches  
+2. User can add their own M3U  
+3. Channel plays  
+4. Screenshot of the UI attached  
+5. On Apple TV: remote channel zap + return to catalog  
 
-Linux Cloud agents cannot run Xcode or the tvOS Simulator. Mac verification requires a Mac with Xcode 26.4+ (or a Cursor private worker that has this repository + Xcode). Record actual build logs and screenshots in `docs/BUILD_RESULTS.md` when available.
+PR #4 (parser-only) does **not** meet this bar and must stay unmerged.
+
+## Cloud limitation
+
+Linux Cloud agents cannot run these builds. A Mac with Xcode 26.4+ (or a private worker that includes the **TeamPlay** repo) is required. Record outcomes in `docs/BUILD_RESULTS.md`.

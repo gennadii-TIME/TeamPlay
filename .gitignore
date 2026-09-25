@@ -28,3 +28,5 @@ lefthook-local.yml
 
 # Vendored engine local build bits
 LumeEngine/build/
+docs/build-logs/*.log
+docs/build-logs/xcode-version.txt
