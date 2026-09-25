@@ -41,7 +41,7 @@ struct ManageProfilesView: View {
                     profileRow(profile)
                 }
             } footer: {
-                Text("Each profile keeps its own watch history, progress and favorites. Profiles sync across your devices via iCloud.")
+                Text("Each profile keeps its own watch history, progress and favorites. Profiles stay on this device until TeamPlay iCloud sync is enabled.")
             }
 
             Section {
@@ -56,7 +56,7 @@ struct ManageProfilesView: View {
                 }
             } footer: {
                 if !premium.isPremium {
-                    Text("Free includes one profile. Upgrade to Lume Pro for the whole household.")
+                    Text("Free includes one profile. Upgrade to TeamPlay Premium for the whole household.")
                 }
             }
 

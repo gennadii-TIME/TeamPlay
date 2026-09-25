@@ -2,12 +2,15 @@
 //  SettingsView+Support.swift
 //  Lume
 //
-//  The "Support" links (website, email, Discord), split out of SettingsView to
+//  The "Support" links (website, email), split out of SettingsView to
 //  keep that type's body within the file-size limit. On iOS / macOS these are
-//  tappable rows that open Safari / Mail / Discord; on tvOS — where the system
-//  can't open a URL — the website and Discord are shown as QR codes to scan with
+//  tappable rows that open Safari / Mail; on tvOS — where the system
+//  can't open a URL — the website is shown as a QR code to scan with
 //  a phone (the same pattern as the Trakt device flow), with email as a
 //  read-only row. Links live in SupportInfo so both surfaces stay in sync.
+//
+//  Modified for TeamPlay: 2026-09-25 — About shows TeamPlay; removed Lume Discord
+//  / "Rate Lume" rows.
 //
 
 import SwiftUI
@@ -27,16 +30,6 @@ extension SettingsView {
                         Label("Email", systemImage: "envelope")
                     }
                 }
-                if let url = SupportInfo.discordURL {
-                    Link(destination: url) {
-                        Label("Discord", systemImage: "bubble.left.and.bubble.right")
-                    }
-                }
-                if let url = SupportInfo.appStoreReviewURL {
-                    Link(destination: url) {
-                        Label("Rate Lume", systemImage: "star")
-                    }
-                }
             } header: {
                 Text("Support")
             } footer: {
@@ -49,14 +42,14 @@ extension SettingsView {
         var aboutSection: some View {
             Section {
                 HStack(spacing: 12) {
-                    Image(systemName: "play.tv.fill")
+                    Image(systemName: "play.rectangle.fill")
                         .font(.title2)
                         .foregroundStyle(.tint)
                         .frame(width: 28, height: 28)
                         .background(.tint.opacity(0.1), in: .rect(cornerRadius: 6))
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Lume")
+                        Text("TeamPlay")
                         Text("Version \(SupportInfo.appVersion)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -73,25 +66,24 @@ extension SettingsView {
             }
         }
     #else
-        /// tvOS About-pane section. Apple TV can't open a URL, so the website and
-        /// Discord are scannable QR codes and the support address is a read-only row.
+        /// tvOS About-pane section. Apple TV can't open a URL, so the website is
+        /// a scannable QR code and the support address is a read-only row.
         var tvSupportSection: some View {
             VStack(alignment: .leading, spacing: 16) {
                 TVSettingsSectionLabel("Support")
 
-                Text("Scan the code with your phone to open our Discord.")
+                Text("Scan the code with your phone to open the TeamPlay website.")
                     .font(.system(size: 22))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, TVSettingsMetrics.rowHPadding)
 
                 HStack(alignment: .top, spacing: 40) {
-                    supportQRCode(caption: "Discord", value: SupportInfo.discordDisplay, link: SupportInfo.discord)
+                    supportQRCode(caption: "Website", value: SupportInfo.websiteDisplay, link: SupportInfo.website)
                 }
                 .padding(.horizontal, TVSettingsMetrics.rowHPadding)
                 .padding(.top, 4)
 
                 VStack(spacing: 2) {
-                    TVSettingsValueRow("Website", value: SupportInfo.websiteDisplay)
                     TVSettingsValueRow("Email", value: SupportInfo.email)
                 }
                 .padding(.top, 8)

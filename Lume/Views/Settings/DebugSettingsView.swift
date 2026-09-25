@@ -89,7 +89,7 @@ extension SettingsView {
             .sheet(item: $mailItem) { item in
                 MailComposeView(
                     recipient: SupportInfo.email,
-                    subject: String(localized: "Lume Diagnostics — \(SupportInfo.appVersion)"),
+                    subject: String(localized: "TeamPlay Diagnostics — \(SupportInfo.appVersion)"),
                     body: String(localized: "Describe the problem here. The diagnostic log is attached.\n\n"),
                     attachmentURL: item.url
                 )

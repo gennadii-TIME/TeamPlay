@@ -42,7 +42,7 @@ struct TraktTokens: Codable, Equatable {
 /// Reads and writes the Trakt token set in the keychain. Stateless and
 /// thread-safe — the keychain itself serializes access.
 enum TraktTokenStore {
-    private static let service = "bilipp.Lume.trakt"
+    private static let service = "time.teamplay.trakt"
     private static let account = "oauth-tokens"
 
     /// Base query identifying the single token item by its primary key

@@ -2,14 +2,15 @@
 //  PremiumManager.swift
 //  Lume
 //
-//  The single source of truth for whether the user has Lume Pro, and the
+//  The single source of truth for whether the user has TeamPlay Premium, and the
 //  StoreKit 2 layer behind it (monthly subscription + one-time lifetime).
 //
-//  Business model: Lume is free, open-source software. Builds the user compiles
-//  and sideloads themselves are fully unlocked (the `SIDE_LOAD` compilation
-//  condition, set only in the "Sideload" build configuration). The App Store
-//  build gates a handful of convenience features behind Lume Pro — see
-//  `PremiumFeature`.
+//  Business model: TeamPlay (derived from Lume) is free, open-source software.
+//  Builds the user compiles and sideloads themselves are fully unlocked (the
+//  `SIDE_LOAD` compilation condition, set only in the "Sideload" build
+//  configuration). The App Store build gates a handful of convenience features
+//  behind TeamPlay Premium — see `PremiumFeature`. Product identifiers are
+//  TeamPlay placeholders until App Store Connect is configured.
 //
 
 import Foundation
@@ -27,17 +28,17 @@ final class PremiumManager {
     /// Every product that can grant Premium — the two currently on sale plus one
     /// retired product we still honour.
     enum Plan: String, CaseIterable {
-        /// Auto-renewable monthly subscription (App Store Connect group "Lume Pro").
-        case monthly = "com.bilipp.lume.pro.monthly"
+        /// Auto-renewable monthly subscription (App Store Connect group "TeamPlay Premium").
+        case monthly = "time.teamplay.premium.monthly"
         /// One-time non-consumable unlock.
-        case lifetime = "com.bilipp.lume.premium.lifetime"
+        case lifetime = "time.teamplay.premium.lifetime"
         /// Retired. This shipped as a *non-consumable* that App Store Connect could
         /// never renew or cancel, while the paywall advertised it as a monthly
         /// subscription — so it never appeared under App Store ▸ Subscriptions and
         /// buyers were understandably confused. It is off sale; the handful of people
         /// who bought it paid once and keep Pro permanently, which is why it still
         /// entitles below. Replaced by `monthly`.
-        case retiredMonthly = "com.bilipp.lume.premium.monthly"
+        case retiredMonthly = "time.teamplay.premium.monthly.retired"
 
         /// The plans the paywall offers, cheapest first.
         static let purchasable: [Plan] = [.monthly, .lifetime]

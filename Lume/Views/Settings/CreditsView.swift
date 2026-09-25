@@ -31,6 +31,11 @@
                         Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
                 }
+                if let url = CreditsInfo.basedOnLumeURL {
+                    Link(destination: url) {
+                        Label("Based on Lume", systemImage: "link")
+                    }
+                }
                 if let url = CreditsInfo.licenseURL {
                     Link(destination: url) {
                         HStack {
@@ -43,9 +48,9 @@
                     }
                 }
             } header: {
-                Text("Lume")
+                Text("TeamPlay")
             } footer: {
-                Text("Lume is free, open-source software, licensed under the GNU Affero General Public License v3.")
+                Text("TeamPlay is based on Lume and is free, open-source software, licensed under the GNU Affero General Public License v3. Lume authorship and licence notices are preserved.")
             }
         }
 
@@ -57,7 +62,7 @@
             } header: {
                 Text("Open Source")
             } footer: {
-                Text("Lume's playback engines build on these open-source projects. Each remains under its own license.")
+                Text("TeamPlay’s playback engines build on these open-source projects. Each remains under its own license.")
             }
         }
 

@@ -418,7 +418,7 @@ final nonisolated class PlexClient: Sendable {
     private static var clientIdentityHeaders: [String: String] {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         return [
-            "X-Plex-Product": "Lume",
+            "X-Plex-Product": "TeamPlay",
             "X-Plex-Version": version,
             "X-Plex-Client-Identifier": clientIdentifier,
             // Informational only — the server shows it in its device list.

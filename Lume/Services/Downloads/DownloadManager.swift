@@ -53,7 +53,7 @@ final class DownloadManager: NSObject {
 
     /// Identifier of the shared background session. Stable across launches —
     /// it is how the app reconnects to transfers `nsurlsessiond` is still running.
-    private static let sessionIdentifier = "bilipp.Lume.downloads"
+    private static let sessionIdentifier = "time.teamplay.downloads"
 
     override private init() {
         super.init()

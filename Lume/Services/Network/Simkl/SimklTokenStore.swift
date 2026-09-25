@@ -46,7 +46,7 @@ struct SimklTokens: Codable, Equatable {
 /// Reads and writes the Simkl token set in the keychain. Stateless and
 /// thread-safe — the keychain itself serializes access.
 enum SimklTokenStore {
-    private static let service = "bilipp.Lume.simkl"
+    private static let service = "time.teamplay.simkl"
     private static let account = "oauth-tokens"
 
     /// Base query identifying the single token item by its primary key

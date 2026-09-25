@@ -22,10 +22,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLName</key>
-			<string>bilipp.Lume.deeplink</string>
+			<string>time.teamplay.deeplink</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>lume</string>
+				<string>teamplay</string>
 			</array>
 		</dict>
 	</array>

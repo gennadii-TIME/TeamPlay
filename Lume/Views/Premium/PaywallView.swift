@@ -2,7 +2,7 @@
 //  PaywallView.swift
 //  Lume
 //
-//  The Lume Pro paywall: benefits list + the two plans (monthly subscription,
+//  The TeamPlay Premium paywall: benefits list + the two plans (monthly subscription,
 //  one-time lifetime). Presented as a sheet whenever a free user reaches a gated
 //  feature, and from the Premium status row in Settings. Never shown in sideloaded
 //  builds (those are always Premium).
@@ -30,10 +30,10 @@ struct PaywallView: View {
         @State private var showRedeemCode = false
     #endif
 
-    /// Apple's standard EULA, plus Lume's privacy policy. Subscriptions must link
+    /// Apple's standard EULA, plus TeamPlay's privacy placeholder. Subscriptions must link
     /// to terms of use and a privacy policy on the purchase screen.
     private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    private static let privacyURL = URL(string: "https://github.com/bilipp/Lume/blob/main/PRIVACY.md")!
+    private static let privacyURL = URL(string: "https://github.com/gennadii-TIME/TeamPlay/blob/main/docs/RELEASE_COMPLIANCE.md")!
 
     var body: some View {
         #if os(tvOS)
@@ -67,7 +67,7 @@ struct PaywallView: View {
                     .frame(maxWidth: 520)
                     .frame(maxWidth: .infinity)
                 }
-                .navigationTitle("Lume Pro")
+                .navigationTitle("TeamPlay Premium")
                 #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
                 #endif
@@ -112,7 +112,7 @@ struct PaywallView: View {
                 Image(systemName: "crown")
                     .font(.system(size: 44))
                     .foregroundStyle(.tint)
-                Text("Unlock Lume Pro")
+                Text("Unlock TeamPlay Premium")
                     .font(.title.bold())
                     .multilineTextAlignment(.center)
                 Text("Lume is free and open source. Pro supports development and unlocks a few extra conveniences.")
@@ -187,7 +187,7 @@ struct PaywallView: View {
                         Image(systemName: "crown")
                             .font(.system(size: 56))
                             .foregroundStyle(.tint)
-                        Text("Lume Pro")
+                        Text("TeamPlay Premium")
                             .font(.system(size: 48, weight: .bold))
                         Text("Lume is free and open source. Pro supports development and unlocks a few extra conveniences.")
                             .font(.system(size: 24))

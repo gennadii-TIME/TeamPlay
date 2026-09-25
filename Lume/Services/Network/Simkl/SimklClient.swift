@@ -86,7 +86,7 @@ nonisolated struct SimklClient {
     }
 
     private static var userAgent: String {
-        "Lume/\(appVersion)"
+        "TeamPlay/\(appVersion)"
     }
 
     /// The URL the user opens to approve the device code — the pre-filled

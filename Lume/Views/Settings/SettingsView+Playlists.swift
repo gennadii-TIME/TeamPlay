@@ -55,7 +55,7 @@ import SwiftUI
                 .buttonStyle(TVSettingsRowButtonStyle())
 
                 if !premium.isPremium {
-                    Text("Free includes one playlist. Upgrade to Lume Pro to add more.")
+                    Text("Free includes one playlist. Upgrade to TeamPlay Premium to add more.")
                         .font(.system(size: 20))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, TVSettingsMetrics.rowHPadding)

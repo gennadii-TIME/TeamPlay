@@ -20,13 +20,13 @@
       "internalID" : "5001",
       "localizations" : [
         {
-          "description" : "Unlock every Lume Pro feature forever with a single payment.",
-          "displayName" : "Lume Pro (Lifetime)",
+          "description" : "Unlock every TeamPlay Premium feature forever with a single payment.",
+          "displayName" : "TeamPlay Premium (Lifetime)",
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.bilipp.lume.premium.lifetime",
-      "referenceName" : "Lume Pro Lifetime",
+      "productID" : "time.teamplay.premium.lifetime",
+      "referenceName" : "TeamPlay Premium Lifetime",
       "type" : "NonConsumable"
     },
     {
@@ -36,12 +36,12 @@
       "localizations" : [
         {
           "description" : "Retired. Kept here only so the grandfathered entitlement path stays testable.",
-          "displayName" : "Lume Pro (Retired Monthly)",
+          "displayName" : "TeamPlay Premium (Retired Monthly)",
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.bilipp.lume.premium.monthly",
-      "referenceName" : "Lume Pro Retired Monthly",
+      "productID" : "time.teamplay.premium.monthly.retired",
+      "referenceName" : "TeamPlay Premium Retired Monthly",
       "type" : "NonConsumable"
     }
   ],
@@ -100,7 +100,7 @@
       "localizations" : [
 
       ],
-      "name" : "Lume Pro",
+      "name" : "TeamPlay Premium",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -127,14 +127,14 @@
           ],
           "localizations" : [
             {
-              "description" : "Unlock every Lume Pro feature, billed monthly.",
-              "displayName" : "Lume Pro (Monthly)",
+              "description" : "Unlock every TeamPlay Premium feature, billed monthly.",
+              "displayName" : "TeamPlay Premium (Monthly)",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.bilipp.lume.pro.monthly",
+          "productID" : "time.teamplay.premium.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Lume Pro Monthly Subscription",
+          "referenceName" : "TeamPlay Premium Monthly Subscription",
           "subscriptionGroupID" : "22272764",
           "type" : "RecurringSubscription",
           "winbackOffers" : [

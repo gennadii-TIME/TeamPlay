@@ -1,8 +1,12 @@
 # NOTICE
 
-TeamPlay is based on the following AGPL-3.0 projects:
+TeamPlay is an independent IPTV player based on Lume. Branding, product
+decisions, and TeamPlay-specific modifications are owned by the TeamPlay
+maintainers. Distributing TeamPlay (including paid App Store builds) requires
+providing the corresponding AGPL source for the Lume-derived portion of the
+version you ship, plus any notices required by other licences below.
 
-## Lume
+## Lume (AGPL-3.0)
 
 - https://github.com/bilipp/Lume
 - Copyright: Lume contributors
@@ -10,14 +14,16 @@ TeamPlay is based on the following AGPL-3.0 projects:
 
 Pinned commit: see `docs/LUME_UPSTREAM_COMMIT.txt`.
 
-## LumeEngine
+## LumeEngine (MIT) + FFmpeg (LGPL-2.1+)
 
 - https://github.com/bilipp/LumeEngine
 - Copyright: LumeEngine contributors
-- License: as provided in `LumeEngine/LICENSE` / `LumeEngine/LICENSES`
+- **Engine source code:** MIT — see `LumeEngine/LICENSE`
+- **Bundled FFmpeg and related patches:** LGPL-2.1+ — see
+  `LumeEngine/THIRD-PARTY-NOTICES.md` and `LumeEngine/LICENSES/`
 
 Pinned commit: see `docs/LUMEENGINE_UPSTREAM_COMMIT.txt`.
 
-TeamPlay branding and product decisions are owned by the TeamPlay maintainers.
-Distributing TeamPlay (including paid App Store builds) requires providing the
-corresponding AGPL source for the version you ship.
+Do not describe LumeEngine itself as an AGPL project; only Lume (the app) is
+AGPL-3.0. FFmpeg remains separately LGPL-licensed and must stay replaceable /
+relinkable per that licence.

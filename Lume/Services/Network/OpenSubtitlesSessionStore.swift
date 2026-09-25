@@ -16,7 +16,7 @@ import Security
 /// Reads and writes the OpenSubtitles session in the keychain. Stateless and
 /// thread-safe — the keychain itself serializes access.
 enum OpenSubtitlesSessionStore {
-    private static let service = "bilipp.Lume.opensubtitles"
+    private static let service = "time.teamplay.opensubtitles"
     private static let account = "user-session"
 
     private static var baseQuery: [String: Any] {

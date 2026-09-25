@@ -7,13 +7,15 @@
 //  since Apple TV can't open a URL itself). One source of truth so the two
 //  surfaces can never drift.
 //
+//  Modified for TeamPlay: 2026-09-25 — removed upstream Lume Discord / App Store
+//  review links; website points at the TeamPlay repository.
+//
 
 import Foundation
 
 nonisolated enum SupportInfo {
     static let website = "https://github.com/gennadii-TIME/TeamPlay"
     static let email = "gennadiistepanov@gmail.com"
-    static let discord = "https://discord.gg/DMnQfr69Ug"
 
     /// App Store listing placeholders until TeamPlay ships its own listing.
     static let appStore = "https://github.com/gennadii-TIME/TeamPlay"
@@ -21,15 +23,10 @@ nonisolated enum SupportInfo {
 
     /// Scheme-stripped forms for compact on-screen display.
     static let websiteDisplay = "github.com/gennadii-TIME/TeamPlay"
-    static let discordDisplay = "discord.gg/DMnQfr69Ug"
     static let appStoreDisplay = "GitHub"
 
     static var websiteURL: URL? {
         URL(string: website)
-    }
-
-    static var discordURL: URL? {
-        URL(string: discord)
     }
 
     static var emailURL: URL? {

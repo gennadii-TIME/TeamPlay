@@ -219,7 +219,7 @@ nonisolated struct OpenSubtitlesClient {
 
     static func defaultUserAgent() -> String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return "Lume v\(version ?? "1.0")"
+        return "TeamPlay v\(version ?? "1.0")"
     }
 
     // MARK: - Search

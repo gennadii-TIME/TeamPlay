@@ -396,7 +396,7 @@ final nonisolated class JellyfinClient: Sendable {
         "SeasonId", "IndexNumber", "ParentIndexNumber", "DateCreated"
     ].joined(separator: ",")
 
-    /// `MediaBrowser Client="Lume", Device="…", DeviceId="…", Version="…"` —
+    /// `MediaBrowser Client="TeamPlay", Device="…", DeviceId="…", Version="…"` —
     /// the form Jellyfin 10.12+ requires on `Authorization`. The device id is
     /// stable per install so the server's device list doesn't grow a row per
     /// login.
@@ -404,7 +404,7 @@ final nonisolated class JellyfinClient: Sendable {
         // Informational only — the server shows it in its device/session list.
         let device = ProcessInfo.processInfo.hostName
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        return "MediaBrowser Client=\"Lume\", Device=\"\(device)\", DeviceId=\"\(deviceId)\", Version=\"\(version)\""
+        return "MediaBrowser Client=\"TeamPlay\", Device=\"\(device)\", DeviceId=\"\(deviceId)\", Version=\"\(version)\""
     }
 
     private static var deviceId: String {

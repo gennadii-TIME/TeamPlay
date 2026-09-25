@@ -2,7 +2,7 @@
 //  SettingsView+Premium.swift
 //  Lume
 //
-//  The Lume Pro surfaces in Settings: the shared paywall helpers, the
+//  The TeamPlay Premium surfaces in Settings: the shared paywall helpers, the
 //  status / upgrade row that sits first in the iOS/macOS list, the DEBUG-only
 //  developer override, and the tvOS Premium pane. Split out of SettingsView to
 //  keep that file within the project's line-count cap.
@@ -74,7 +74,7 @@ extension SettingsView {
                             .frame(width: 30)
                         VStack(alignment: .leading, spacing: 1) {
                             // The plan, not the product name — the section header
-                            // already says "Lume Pro".
+                            // already says "TeamPlay Premium".
                             Text(premiumPlanTitle)
                             if let premiumRenewalDetail {
                                 Text(premiumRenewalDetail)
@@ -100,7 +100,7 @@ extension SettingsView {
                                 .font(.title3)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Unlock Lume Pro")
+                                Text("Unlock TeamPlay Premium")
                                     .foregroundStyle(.primary)
                                 Text("Free plan · See what's included")
                                     .font(.caption)
@@ -118,7 +118,7 @@ extension SettingsView {
                 // Not "Subscription" — lifetime owners see this section too, and
                 // labelling a one-time purchase a subscription is what sent people
                 // hunting for a cancel button that couldn't exist.
-                Text("Lume Pro")
+                Text("TeamPlay Premium")
             }
         }
 
@@ -165,7 +165,7 @@ extension SettingsView {
                             .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(premium.isPremium ? "Lume Pro" : "Free Plan")
+                            Text(premium.isPremium ? "TeamPlay Premium" : "Free Plan")
                                 .font(.system(size: 26, weight: .semibold))
                             Text(premium.isPremium
                                 ? premiumStatusDetail

@@ -144,7 +144,7 @@ nonisolated struct PerfInterval {
 nonisolated enum Perf {
     /// Matches `Logger`'s subsystem so a single Instruments/`log` filter covers
     /// both the app's log messages and its signposts.
-    static let subsystem = Bundle.main.bundleIdentifier ?? "com.bilipp.lume"
+    static let subsystem = Bundle.main.bundleIdentifier ?? "time.teamplay.app"
     static let category = "Performance"
 
     private static let signposter = OSSignposter(subsystem: subsystem, category: category)
