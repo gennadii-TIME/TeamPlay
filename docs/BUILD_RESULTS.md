@@ -1,56 +1,53 @@
 # Build results — multi-platform matrix (PR #6)
 
 Branch: `cursor/teamplay-lume-base-8341` · Draft [PR #6](https://github.com/gennadii-TIME/TeamPlay/pull/6)  
-PR #4 stays unmerged (parser-only; does not meet PRODUCT_PLAN).
+PR #4 stays unmerged.
 
-## Cloud / this agent
+## Latest attempt (2026-09-25)
 
 | Item | Value |
 |---|---|
-| Host | **Linux** Cursor Cloud (`uname`: Linux x86_64) |
+| This agent host | **Linux** managed Cloud (`runtime=managed`, `uname=Linux`) |
 | `xcodebuild` | **Not found** |
-| Simulators | **Unavailable** |
-| Date | 2026-09-25 |
+| Private worker **TeamPlay-Mac** | **Online**, idle, repo `gennadii-TIME/TeamPlay`, `eligibleForSubagent=true`, workerId `34fc848e-2a8e-4863-8a1b-4b5b64525185` |
+| Placement | Cloud/Task subagents from this run were **not** scheduled onto TeamPlay-Mac (landed on managed Linux again: [bc-dcfecddc](bc-dcfecddc-0431-59e9-a2c4-73b074d5cf99), [bc-ba7a3169](bc-ba7a3169-0299-5f61-92aa-d43f8980cb88)) |
 
-**Blocker:** this environment cannot compile or run Apple platforms. Verification must happen in **Cursor on your Mac** (or a private Mac worker that includes the TeamPlay repo — currently the online worker is only registered for `juplite`).
+**Blocker:** this conversation runs on managed Linux and cannot relocate itself to TeamPlay-Mac. Builds/screenshots require a **new agent run started on TeamPlay-Mac** (private worker), or manual Cursor Desktop on that Mac.
+
+### How to unblock
+
+1. In Cursor, start a Cloud Agent / worker session **on TeamPlay-Mac** (not managed public cloud).
+2. Checkout `cursor/teamplay-lume-base-8341`, merge `main`, run:
+
+```bash
+xcodebuild -version
+xcodebuild -showsdks
+xcrun simctl list devices available
+./Scripts/build-all-platforms.sh
+```
+
+3. Fix failures, fill this file’s matrix, attach screenshots to PR #6, keep PR draft, do not merge.
+
+See also `docs/MAC_VERIFICATION.md`.
 
 ## Upstream pins
 
 See `LUME_UPSTREAM_COMMIT.txt` / `LUMEENGINE_UPSTREAM_COMMIT.txt`.
 
-## Xcode project platforms (declared)
+## Declared platforms (`Lume.xcodeproj`)
 
 `SUPPORTED_PLATFORMS = appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator`  
-`TARGETED_DEVICE_FAMILY = 1,2,3,7`  
-Deployment: **iOS/tvOS 18**, **macOS 15**, **visionOS 2** · requires **Xcode 26.4+**
+Deployment: **iOS/tvOS 18**, **macOS 15**, **visionOS 2** · **Xcode 26.4+** required.
 
-## Mac steps (Cursor on Mac — fill this section)
-
-```bash
-cd /path/to/TeamPlay
-git fetch origin
-git checkout cursor/teamplay-lume-base-8341
-git pull origin cursor/teamplay-lume-base-8341
-git merge origin/main   # keep PRODUCT_PLAN current
-
-xcodebuild -version
-xcodebuild -showsdks
-xcrun simctl list devices available
-
-./Scripts/build-all-platforms.sh
-```
-
-If Xcode **&lt; 26.4**, record the installed version here and stop — do not claim success.
-
-### Toolchain observed on Mac
+## Mac toolchain (fill on TeamPlay-Mac)
 
 | Item | Value |
 |---|---|
-| `xcodebuild -version` | _pending_ |
-| SDKs present | _pending_ |
-| Apple TV / iPhone / iPad / Vision simulators | _pending_ |
+| `xcodebuild -version` | _pending — run on TeamPlay-Mac_ |
+| SDKs | _pending_ |
+| Simulators (TV / iPhone / iPad / Vision) | _pending_ |
 
-### Matrix
+## Matrix (fill on TeamPlay-Mac)
 
 | Platform | Build | Add M3U | Play | Screenshot |
 |---|---|---|---|---|
@@ -62,10 +59,4 @@ If Xcode **&lt; 26.4**, record the installed version here and stop — do not cl
 
 ### Logs / screenshots
 
-- Build logs: `docs/build-logs/` (from `Scripts/build-all-platforms.sh`)
-- Attach Simulator/device screenshots to PR #6; keep the PR **draft** until this matrix is filled.
-
-## Related
-
-- Feature #5 (commercial mute) is **after** this foundation PR — separate PR once builds are green.
-- PR #4: do not merge.
+_Pending TeamPlay-Mac run._
