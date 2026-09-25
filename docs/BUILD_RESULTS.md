@@ -1,31 +1,56 @@
-# Build results — multi-platform matrix
+# Build results — multi-platform matrix (PR #6)
 
-## Cloud agent (this run)
+Branch: `cursor/teamplay-lume-base-8341` · Draft [PR #6](https://github.com/gennadii-TIME/TeamPlay/pull/6)  
+PR #4 stays unmerged (parser-only; does not meet PRODUCT_PLAN).
+
+## Cloud / this agent
 
 | Item | Value |
 |---|---|
-| Host | Linux Cursor Cloud |
-| Xcode / Simulators | **Unavailable** |
+| Host | **Linux** Cursor Cloud (`uname`: Linux x86_64) |
+| `xcodebuild` | **Not found** |
+| Simulators | **Unavailable** |
 | Date | 2026-09-25 |
 
-Private Mac worker `MacBook-Air-M5` was online but registered only for
-`gennadii-TIME/juplite`, not TeamPlay — not usable for this repo’s `xcodebuild`.
-
-Dedicated build attempt ([Mac Xcode Lume build](bc-5fce08f0-f169-5db1-a992-b5037100ea5f)) also ran on Linux without Xcode; multi-platform `xcodebuild` and screenshots were not attempted there.
+**Blocker:** this environment cannot compile or run Apple platforms. Verification must happen in **Cursor on your Mac** (or a private Mac worker that includes the TeamPlay repo — currently the online worker is only registered for `juplite`).
 
 ## Upstream pins
 
 See `LUME_UPSTREAM_COMMIT.txt` / `LUMEENGINE_UPSTREAM_COMMIT.txt`.
 
-## Xcode project platforms (from `Lume.xcodeproj`)
+## Xcode project platforms (declared)
 
 `SUPPORTED_PLATFORMS = appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator`  
 `TARGETED_DEVICE_FAMILY = 1,2,3,7`  
-Deployment: iOS 18 / tvOS 18 / macOS 15 / visionOS 2 — matches PRODUCT_PLAN.
+Deployment: **iOS/tvOS 18**, **macOS 15**, **visionOS 2** · requires **Xcode 26.4+**
 
-## Mac verification checklist (reviewer or Mac worker)
+## Mac steps (Cursor on Mac — fill this section)
 
-Run `Scripts/build-all-platforms.sh` then manual playback on each destination.
+```bash
+cd /path/to/TeamPlay
+git fetch origin
+git checkout cursor/teamplay-lume-base-8341
+git pull origin cursor/teamplay-lume-base-8341
+git merge origin/main   # keep PRODUCT_PLAN current
+
+xcodebuild -version
+xcodebuild -showsdks
+xcrun simctl list devices available
+
+./Scripts/build-all-platforms.sh
+```
+
+If Xcode **&lt; 26.4**, record the installed version here and stop — do not claim success.
+
+### Toolchain observed on Mac
+
+| Item | Value |
+|---|---|
+| `xcodebuild -version` | _pending_ |
+| SDKs present | _pending_ |
+| Apple TV / iPhone / iPad / Vision simulators | _pending_ |
+
+### Matrix
 
 | Platform | Build | Add M3U | Play | Screenshot |
 |---|---|---|---|---|
@@ -35,13 +60,12 @@ Run `Scripts/build-all-platforms.sh` then manual playback on each destination.
 | Mac (macOS 15) | ☐ | ☐ | ☐ | ☐ |
 | Vision Pro (visionOS 2) | ☐ | ☐ | ☐ | ☐ |
 
-Paste `xcodebuild -version`, log tails from `docs/build-logs/`, and screenshot
-paths below when complete.
-
 ### Logs / screenshots
 
-_Pending Mac run._
+- Build logs: `docs/build-logs/` (from `Scripts/build-all-platforms.sh`)
+- Attach Simulator/device screenshots to PR #6; keep the PR **draft** until this matrix is filled.
 
-## PR #4
+## Related
 
-Draft PR #4 remains a parser-only prototype and **must not be merged**.
+- Feature #5 (commercial mute) is **after** this foundation PR — separate PR once builds are green.
+- PR #4: do not merge.
