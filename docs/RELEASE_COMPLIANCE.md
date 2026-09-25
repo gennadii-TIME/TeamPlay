@@ -19,6 +19,16 @@
 6. **Контент.** Не включать встроенные сомнительные плейлисты, каналы, чужие логотипы/материалы без прав. Проверить test fixtures и демонстрационные данные, выдать App Review инструкции для проверки на законном тестовом источнике.
 7. **Платёжная приёмка (#2).** После работающего прототипа подтвердить в StoreKit sandbox: 14 дней полного просмотра, отображение местной цены, отсутствие автоматического списания, один бессрочный unlock, Restore Purchases, смена устройства/платформы, поведение без сети и после завершения пробного срока. Единую покупку для пяти платформ обещать только после проверки модели в App Store Connect.
 
+## Дополнительные находки в PR #6
+
+- `Lume/Lume-iOS.entitlements` и `Lume/Lume.entitlements` ещё указывают `iCloud.bilipp.Lume`; iOS также указывает `group.com.bilipp.lume`. Зарегистрировать собственные контейнеры и группы TeamPlay либо отключить зависимые функции до настройки capabilities.
+- `Lume/Info.plist` содержит URL scheme `lume` и `bilipp.Lume.deeplink`. `Lume/Utils/SupportInfo.swift` содержит Discord Lume; `SettingsView+Support.swift` показывает `Rate Lume` и `Lume` в About. `PaywallView.swift` ведёт на privacy policy Lume. `OpenSubtitlesClient.swift` отправляет User-Agent `Lume v…`. Каждую активную ссылку/идентификатор заменить или убрать без потери атрибуции в Legal.
+- `Lume/Services/Premium/PremiumManager.swift` подтверждает, что старые продукты не только в конфигурации StoreKit: там есть месячная подписка, lifetime и retired monthly, а `SettingsView+Premium.swift` ограничивает число плейлистов. Схему 14 дней полного доступа надо заменить **во всём коде** после прототипа.
+- В ветке скопированы логотипы, AppIcon/tvOS brandassets, маркетинговые скриншоты и баннеры Lume. Использовать свои фирменные материалы; сохранить необходимые copyright notices исходников. Отдельно проверить права на любые изображения, шрифты, каналы и API-провайдеров в финальном бинарном продукте.
+- `NOTICE` сейчас ошибочно группирует LumeEngine среди «AGPL-3.0 projects». Собственный код LumeEngine MIT; FFmpeg отдельно LGPL-2.1+. Исправить Notice в рабочей ветке, сохранить MIT attribution.
+
+Подробная матрица действий Cursor: [LUME_ADAPTATION.md](LUME_ADAPTATION.md).
+
 ## Источники
 
 - [GNU AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.en.html), особенно разделы 4–6 и 13.

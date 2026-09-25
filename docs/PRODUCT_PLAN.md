@@ -2,6 +2,8 @@
 
 Источник обсуждения: https://github.com/gennadii-TIME/TeamPlay/issues/3
 
+**Обязательное задание Cursor по адаптации Lume:** [LUME_ADAPTATION.md](LUME_ADAPTATION.md). Проверка выпуска: [RELEASE_COMPLIANCE.md](RELEASE_COMPLIANCE.md), issue #7.
+
 **Платформы первого релиза:** Apple TV (tvOS), iPhone и iPad (iOS/iPadOS), Mac (macOS), Apple Vision Pro (visionOS) — все платформы исходного Lume. Разработка ведётся сразу для всех, с общим кодом и адаптированным интерфейсом каждой платформы. Основа — Lume с соблюдением AGPL-3.0; собственный бренд и удобный интерфейс TeamPlay. Разработку ведёт Cursor в отдельных PR. Первый рабочий прототип — #1; монетизация — #2.
 
 ## Обязательная техническая основа — исходный код Lume
