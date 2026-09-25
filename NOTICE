@@ -1,0 +1,12 @@
+# NOTICE
+
+This product includes software adapted from Lume:
+
+- Project: https://github.com/bilipp/Lume
+- Copyright: Lume contributors
+- License: GNU Affero General Public License v3.0 (see LICENSE)
+
+Specifically, TeamPlay's M3U streaming parser is derived from Lume's
+`M3UParser.swift`. TeamPlay is a separate Apple TV IPTV client focused on
+user-provided playlists; it is not affiliated with or endorsed by the Lume
+authors.
