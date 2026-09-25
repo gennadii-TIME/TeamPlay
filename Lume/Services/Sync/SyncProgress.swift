@@ -1,0 +1,164 @@
+//
+//  SyncProgress.swift
+//  Lume
+//
+//  Observable progress tracker for ContentSyncManager. The sync actor publishes
+//  step transitions and batch counts into this object; the SyncProgressView
+//  renders the current state.
+//
+
+import Foundation
+import Observation
+import SwiftUI
+
+// MARK: - Sync Steps
+
+enum SyncStep: Int, CaseIterable, Identifiable {
+    case authenticating
+    case movieCategories
+    case seriesCategories
+    case liveCategories
+    case movies
+    case series
+    case liveStreams
+    // m3u-only steps
+    case playlistDownload
+    case playlistImport
+    /// WebDAV-only: the recursive PROPFIND walk of the share.
+    case directoryWalk
+
+    var id: Int {
+        rawValue
+    }
+
+    /// The steps an Xtream sync walks through, in order.
+    static let xtreamSteps: [SyncStep] = [
+        .authenticating, .movieCategories, .seriesCategories, .liveCategories,
+        .movies, .series, .liveStreams
+    ]
+
+    /// The steps an m3u sync walks through, in order.
+    static let m3uSteps: [SyncStep] = [.playlistDownload, .playlistImport]
+
+    /// A default Stalker sync fetches only the category lists and live
+    /// channels; movie/series *content* is loaded per-category on demand, so
+    /// those steps are omitted. A full-catalog download uses `xtreamSteps`.
+    static let stalkerDynamicSteps: [SyncStep] = [
+        .authenticating, .movieCategories, .seriesCategories, .liveCategories, .liveStreams
+    ]
+
+    /// The steps a WebDAV sync walks through, in order. The recursive PROPFIND
+    /// walk replaces the single m3u download phase.
+    static let webdavSteps: [SyncStep] = [.directoryWalk, .playlistImport]
+
+    /// The steps a media-server sync walks through, in order: login, then the
+    /// two library kinds. There are no live channels and no categories to
+    /// fetch — a category per library is created inline. Shared by Jellyfin,
+    /// Emby and Plex, whose pipelines have the same shape.
+    static let mediaServerSteps: [SyncStep] = [.authenticating, .movies, .series]
+
+    static func steps(for sourceType: PlaylistSourceType, full: Bool = false) -> [SyncStep] {
+        switch sourceType {
+        case .xtream: xtreamSteps
+        case .m3u: m3uSteps
+        // Stalker maps onto the same catalog kinds as Xtream, but its default
+        // sync skips the movie/series content walk (loaded on demand); only a
+        // full-catalog download walks everything.
+        case .stalker: full ? xtreamSteps : stalkerDynamicSteps
+        case .webdav: webdavSteps
+        case .jellyfin, .emby, .plex: mediaServerSteps
+        }
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .authenticating: "Authenticating"
+        case .movieCategories: "Movie categories"
+        case .seriesCategories: "Series categories"
+        case .liveCategories: "Live TV categories"
+        case .movies: "Movies"
+        case .series: "Series"
+        case .liveStreams: "Live TV channels"
+        case .playlistDownload: "Downloading playlist"
+        case .playlistImport: "Importing content"
+        case .directoryWalk: "Scanning folders"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .authenticating: "person.badge.key"
+        case .movieCategories: "folder"
+        case .seriesCategories: "folder"
+        case .liveCategories: "folder"
+        case .movies: "film.stack"
+        case .series: "tv"
+        case .liveStreams: "antenna.radiowaves.left.and.right"
+        case .playlistDownload: "arrow.down.circle"
+        case .playlistImport: "square.and.arrow.down.on.square"
+        case .directoryWalk: "folder.badge.gearshape"
+        }
+    }
+}
+
+// MARK: - Step state
+
+enum SyncStepState {
+    case pending
+    case active
+    case completed
+}
+
+// MARK: - Progress tracker
+
+/// MainActor-isolated by default per project config. The actor uses `await` to
+/// publish updates, which hops onto MainActor — SwiftUI then reacts via
+/// @Observable.
+@Observable
+final class SyncProgress {
+    /// The ordered steps this sync walks through — Xtream and m3u playlists
+    /// have different pipelines, so the progress view renders this list.
+    let steps: [SyncStep]
+
+    init(steps: [SyncStep] = SyncStep.xtreamSteps) {
+        self.steps = steps
+    }
+
+    private(set) var currentStep: SyncStep?
+    private(set) var completedSteps: Set<SyncStep> = []
+    private(set) var stepDetail: String = ""
+    /// 0...1 inside the active step. 0 means indeterminate / not applicable.
+    private(set) var stepFraction: Double = 0
+
+    func start(_ step: SyncStep) {
+        currentStep = step
+        stepDetail = ""
+        stepFraction = 0
+    }
+
+    func complete(_ step: SyncStep) {
+        completedSteps.insert(step)
+        if currentStep == step {
+            currentStep = nil
+        }
+    }
+
+    func update(detail: String, fraction: Double = 0) {
+        stepDetail = detail
+        stepFraction = fraction
+    }
+
+    func state(for step: SyncStep) -> SyncStepState {
+        if completedSteps.contains(step) { return .completed }
+        if currentStep == step { return .active }
+        return .pending
+    }
+
+    /// Overall fraction across all steps, useful for a top-level bar.
+    var overallFraction: Double {
+        let total = Double(steps.count)
+        let done = Double(completedSteps.count)
+        let active = currentStep != nil ? stepFraction : 0
+        return min(1, (done + active) / total)
+    }
+}
