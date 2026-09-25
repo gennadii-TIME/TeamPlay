@@ -1,0 +1,477 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E23046FA6B6E4C6294847B44 /* TeamPlayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD61BAA160B4A2F97B57871 /* TeamPlayApp.swift */; };
+		AFDECECACE9A45C5B4D0C20C /* Playlist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 440C8574797F4B83B6ACE1C7 /* Playlist.swift */; };
+		EB69951F45F24D3E9E40EEED /* LiveChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 695280E8FEDB46DB8B8B9EF3 /* LiveChannel.swift */; };
+		599BF223F9AB4E2D95020436 /* M3UParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9784A6F3DD164AAB94F2E68C /* M3UParser.swift */; };
+		A24961D3209F451BAB8A07C5 /* M3UClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48398DE90EA0492A843D0CE2 /* M3UClient.swift */; };
+		EAEE477F51F249E5BA783170 /* PlaylistImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD84AA11EE045978EB6C2F0 /* PlaylistImporter.swift */; };
+		4571B44CD49D45C1B3F46117 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE3E9D6EE6B4A9595C4F412 /* PlaybackController.swift */; };
+		89AE33ACF570499EBF2E0CAE /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A16F4DC18F4AC3992C5396 /* RootView.swift */; };
+		FFE3A9FF74DD42B5B2CD1CFD /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238B4FA0128946DAB8328193 /* OnboardingView.swift */; };
+		807803B21A2048DEB8D69130 /* LiveTVHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 725EF08FF31748B1B9CFC2CD /* LiveTVHomeView.swift */; };
+		9817D1DB0D38421382451FF5 /* AddPlaylistSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 721B816FDECE4F318925B818 /* AddPlaylistSheet.swift */; };
+		5279C8B26501400E864303E1 /* PlaylistManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 177811017C7E440796956E8B /* PlaylistManagerView.swift */; };
+		BAA646F79A2E40CE803FFD36 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DEF6729D974C609E7E3CE9 /* PlayerView.swift */; };
+		73C3AF8D153A4E9CA011C202 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C2B74FA071F64D71B12602E2 /* Assets.xcassets */; };
+		F817C59756DE48AEACAF0851 /* M3UParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81F483CC1C24A79AAB21F96 /* M3UParserTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4AF1B1D2AFBA4489A353CB28 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E2D2A9343E3B41CD99F68888 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9906990D2BBF4A389632E370;
+			remoteInfo = TeamPlay;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		9BD61BAA160B4A2F97B57871 /* TeamPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamPlayApp.swift; sourceTree = "<group>"; };
+		440C8574797F4B83B6ACE1C7 /* Playlist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playlist.swift; sourceTree = "<group>"; };
+		695280E8FEDB46DB8B8B9EF3 /* LiveChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveChannel.swift; sourceTree = "<group>"; };
+		9784A6F3DD164AAB94F2E68C /* M3UParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3UParser.swift; sourceTree = "<group>"; };
+		48398DE90EA0492A843D0CE2 /* M3UClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3UClient.swift; sourceTree = "<group>"; };
+		2AD84AA11EE045978EB6C2F0 /* PlaylistImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistImporter.swift; sourceTree = "<group>"; };
+		0BE3E9D6EE6B4A9595C4F412 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
+		57A16F4DC18F4AC3992C5396 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		238B4FA0128946DAB8328193 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		725EF08FF31748B1B9CFC2CD /* LiveTVHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTVHomeView.swift; sourceTree = "<group>"; };
+		721B816FDECE4F318925B818 /* AddPlaylistSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPlaylistSheet.swift; sourceTree = "<group>"; };
+		177811017C7E440796956E8B /* PlaylistManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistManagerView.swift; sourceTree = "<group>"; };
+		21DEF6729D974C609E7E3CE9 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		C2B74FA071F64D71B12602E2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		172AD9B2749746A187AD31E4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BD72533E2E704C299611CCC6 /* TeamPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeamPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D81F483CC1C24A79AAB21F96 /* M3UParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3UParserTests.swift; sourceTree = "<group>"; };
+		A4087D05383A4EC69221377C /* TeamPlayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TeamPlayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA555407C0304D5BB5B8A023 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8E2436533F184BF88320B6BA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		75F0DFFAA6B14485B2490A2E = {
+			isa = PBXGroup;
+			children = (
+				B3F59AD946D6419797A83E07 /* TeamPlay */,
+				21C71DA3B5D243EDA9EE62D5 /* TeamPlayTests */,
+				89BF8A54891D45D5A6B7F35D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		89BF8A54891D45D5A6B7F35D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BD72533E2E704C299611CCC6 /* TeamPlay.app */,
+				A4087D05383A4EC69221377C /* TeamPlayTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B3F59AD946D6419797A83E07 /* TeamPlay */ = {
+			isa = PBXGroup;
+			children = (
+				9BD61BAA160B4A2F97B57871 /* TeamPlayApp.swift */,
+				B89227BE01B44E8396830046 /* Models */,
+				60DB7998172642E3BB4A3978 /* Services */,
+				B7B592FD095049B49806DE14 /* Views */,
+				C2B74FA071F64D71B12602E2 /* Assets.xcassets */,
+				172AD9B2749746A187AD31E4 /* Info.plist */,
+			);
+			path = TeamPlay;
+			sourceTree = "<group>";
+		};
+		B89227BE01B44E8396830046 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				440C8574797F4B83B6ACE1C7 /* Playlist.swift */,
+				695280E8FEDB46DB8B8B9EF3 /* LiveChannel.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		60DB7998172642E3BB4A3978 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				10A6C18015A14B2289197C93 /* Network */,
+				E61BDEEFEF954456AED00A59 /* Sync */,
+				01B5851957204952AE18694C /* Player */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		10A6C18015A14B2289197C93 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				9784A6F3DD164AAB94F2E68C /* M3UParser.swift */,
+				48398DE90EA0492A843D0CE2 /* M3UClient.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		E61BDEEFEF954456AED00A59 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				2AD84AA11EE045978EB6C2F0 /* PlaylistImporter.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		01B5851957204952AE18694C /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				0BE3E9D6EE6B4A9595C4F412 /* PlaybackController.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		B7B592FD095049B49806DE14 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				57A16F4DC18F4AC3992C5396 /* RootView.swift */,
+				77FD41930C234677A0028668 /* Onboarding */,
+				78EAE0EED45D4446B02380C4 /* LiveTV */,
+				6AB7BEA791CA4BB1934B7655 /* Player */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		77FD41930C234677A0028668 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				238B4FA0128946DAB8328193 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		78EAE0EED45D4446B02380C4 /* LiveTV */ = {
+			isa = PBXGroup;
+			children = (
+				725EF08FF31748B1B9CFC2CD /* LiveTVHomeView.swift */,
+				721B816FDECE4F318925B818 /* AddPlaylistSheet.swift */,
+				177811017C7E440796956E8B /* PlaylistManagerView.swift */,
+			);
+			path = LiveTV;
+			sourceTree = "<group>";
+		};
+		6AB7BEA791CA4BB1934B7655 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				21DEF6729D974C609E7E3CE9 /* PlayerView.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		21C71DA3B5D243EDA9EE62D5 /* TeamPlayTests */ = {
+			isa = PBXGroup;
+			children = (
+				D81F483CC1C24A79AAB21F96 /* M3UParserTests.swift */,
+			);
+			path = TeamPlayTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9906990D2BBF4A389632E370 /* TeamPlay */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D39BDD67210D4982BA11237E /* Build configuration list for PBXNativeTarget "TeamPlay" */;
+			buildPhases = (
+				4E2F091EBC844A11BAA45DAF /* Sources */,
+				AA555407C0304D5BB5B8A023 /* Frameworks */,
+				213D743ABFFF4AC2BCF6FC8F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TeamPlay;
+			productName = TeamPlay;
+			productReference = BD72533E2E704C299611CCC6 /* TeamPlay.app */;
+			productType = "com.apple.product-type.application";
+		};
+		78FF3C43AAD24377BC313E9D /* TeamPlayTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 354474B0B2844FE981A9FD7A /* Build configuration list for PBXNativeTarget "TeamPlayTests" */;
+			buildPhases = (
+				80DBE4C0EF2947A1ABDF4B5E /* Sources */,
+				8E2436533F184BF88320B6BA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				301A97653ADE490AA92B5EFA /* PBXTargetDependency */,
+			);
+			name = TeamPlayTests;
+			productName = TeamPlayTests;
+			productReference = A4087D05383A4EC69221377C /* TeamPlayTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E2D2A9343E3B41CD99F68888 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					9906990D2BBF4A389632E370 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					78FF3C43AAD24377BC313E9D = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 9906990D2BBF4A389632E370;
+					};
+				};
+			};
+			buildConfigurationList = 56D0C54EF1C24C97BF8E0034 /* Build configuration list for PBXProject "TeamPlay" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 75F0DFFAA6B14485B2490A2E;
+			productRefGroup = 89BF8A54891D45D5A6B7F35D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9906990D2BBF4A389632E370 /* TeamPlay */,
+				78FF3C43AAD24377BC313E9D /* TeamPlayTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		213D743ABFFF4AC2BCF6FC8F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				73C3AF8D153A4E9CA011C202 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4E2F091EBC844A11BAA45DAF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E23046FA6B6E4C6294847B44 /* TeamPlayApp.swift in Sources */,
+				AFDECECACE9A45C5B4D0C20C /* Playlist.swift in Sources */,
+				EB69951F45F24D3E9E40EEED /* LiveChannel.swift in Sources */,
+				599BF223F9AB4E2D95020436 /* M3UParser.swift in Sources */,
+				A24961D3209F451BAB8A07C5 /* M3UClient.swift in Sources */,
+				EAEE477F51F249E5BA783170 /* PlaylistImporter.swift in Sources */,
+				4571B44CD49D45C1B3F46117 /* PlaybackController.swift in Sources */,
+				89AE33ACF570499EBF2E0CAE /* RootView.swift in Sources */,
+				FFE3A9FF74DD42B5B2CD1CFD /* OnboardingView.swift in Sources */,
+				807803B21A2048DEB8D69130 /* LiveTVHomeView.swift in Sources */,
+				9817D1DB0D38421382451FF5 /* AddPlaylistSheet.swift in Sources */,
+				5279C8B26501400E864303E1 /* PlaylistManagerView.swift in Sources */,
+				BAA646F79A2E40CE803FFD36 /* PlayerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		80DBE4C0EF2947A1ABDF4B5E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F817C59756DE48AEACAF0851 /* M3UParserTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		301A97653ADE490AA92B5EFA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9906990D2BBF4A389632E370 /* TeamPlay */;
+			targetProxy = 4AF1B1D2AFBA4489A353CB28 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		DD40DEB31071469E8E175EEB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = appletvos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		3AC23E3AACFF43099AAC7585 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SDKROOT = appletvos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		6B53AF6C186D4635A4A08FF5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TeamPlay/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		D711FDA07FDC4CF086CBE5B7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TeamPlay/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Release;
+		};
+		23B5C9354400471E86BDF5B2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TeamPlay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TeamPlay";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		6356B63543764231A51489EA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TeamPlay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TeamPlay";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		56D0C54EF1C24C97BF8E0034 /* Build configuration list for PBXProject "TeamPlay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DD40DEB31071469E8E175EEB /* Debug */,
+				3AC23E3AACFF43099AAC7585 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D39BDD67210D4982BA11237E /* Build configuration list for PBXNativeTarget "TeamPlay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6B53AF6C186D4635A4A08FF5 /* Debug */,
+				D711FDA07FDC4CF086CBE5B7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		354474B0B2844FE981A9FD7A /* Build configuration list for PBXNativeTarget "TeamPlayTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				23B5C9354400471E86BDF5B2 /* Debug */,
+				6356B63543764231A51489EA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E2D2A9343E3B41CD99F68888 /* Project object */;
+}

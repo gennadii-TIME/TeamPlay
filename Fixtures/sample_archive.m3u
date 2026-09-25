@@ -1,0 +1,7 @@
+#EXTM3U url-tvg="https://example.com/epg.xml"
+#EXTINF:-1 tvg-id="plain" tvg-logo="" group-title="News",Plain News
+https://cdn.example/plain.m3u8
+#EXTINF:-1 tvg-id="arch" catchup="default" catchup-days="3" group-title="News",News With Archive
+https://cdn.example/arch.m3u8
+#EXTINF:-1 tvg-id="vod" group-title="Movies" type="movie",Sample Film
+https://cdn.example/movie.mp4
