@@ -11,10 +11,17 @@ import SwiftUI
 
 @main
 struct LumeApp: App {
-    /// The CloudKit private-database container backing iCloud sync. Must match
-    /// the id in `Lume.entitlements` and exist in the Apple Developer portal /
-    /// CloudKit Console (schema deployed to Production before App Store release).
-    static let cloudKitContainerIdentifier = "iCloud.bilipp.Lume"
+    /// Future TeamPlay CloudKit container id (register in Developer portal before
+    /// flipping `isCloudKitSyncConfigured`). Must never point at upstream
+    /// `iCloud.bilipp.Lume`.
+    static let cloudKitContainerIdentifier = "iCloud.time.teamplay.app"
+
+    /// CloudKit sync stays off until the TeamPlay iCloud container and
+    /// entitlements are provisioned. With this false, both stores use
+    /// `cloudKitDatabase: .none` and `CloudSyncCoordinator` skips every
+    /// `CKContainer` call — so Mac/iOS/tvOS launch without `-ui-testing` or a
+    /// temporary entitlements override.
+    static let isCloudKitSyncConfigured = false
 
     /// The local-only catalog store. The app's environment container — every
     /// browse `@Query` binds to it, so CloudKit's churn (which only touches the
@@ -154,16 +161,14 @@ struct LumeApp: App {
     /// no CloudKit provisioning). Likewise `CKContainer(identifier:)` raises on an
     /// un-entitled id. In those contexts we skip CloudKit entirely: the user-data
     /// store stays local and the reconcile engine still runs (just no sync).
-    /// Real, properly-signed builds get full CloudKit sync.
+    ///
+    /// TeamPlay also keeps sync off until `isCloudKitSyncConfigured` is flipped
+    /// after a real `iCloud.time.teamplay.app` container is registered — so
+    /// everyday Debug launches (including macOS) do not need `-ui-testing` or a
+    /// temporary entitlements override.
     static let isCloudKitEnvironment: Bool = {
+        guard isCloudKitSyncConfigured else { return false }
         #if SIDE_LOAD
-            // Sideloaded / self-compiled builds are re-signed with an identity that
-            // doesn't own the `iCloud.bilipp.Lume` container, so the CloudKit
-            // entitlement is stripped at install time. Touching CloudKit then hard-
-            // crashes at launch — the un-catchable `_os_crash` in
-            // `containerWithIdentifier:` documented above. Keep all user data
-            // local-only: both stores resolve to `cloudKitDatabase: .none` and the
-            // sync coordinator skips every `CKContainer`/`accountStatus` call.
             return false
         #else
             let environment = ProcessInfo.processInfo.environment

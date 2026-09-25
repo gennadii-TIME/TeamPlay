@@ -41,7 +41,7 @@ import SwiftUI
             } header: {
                 Text("Profiles")
             } footer: {
-                Text("Each profile keeps its own watch history, progress and favorites. Profiles sync across your devices via iCloud.")
+                Text("Each profile keeps its own watch history, progress and favorites. Profiles stay on this device until TeamPlay iCloud sync is enabled.")
             }
         }
     }

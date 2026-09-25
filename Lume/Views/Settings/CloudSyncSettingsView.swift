@@ -54,7 +54,11 @@ enum CloudSyncStatusText {
     }
 
     static var footer: LocalizedStringKey {
-        "Your playlists, watch progress, favorites and watchlist sync across your devices through your private iCloud account. The video catalog itself is fetched on each device and isn’t uploaded."
+        if LumeApp.isCloudKitSyncConfigured {
+            "Your playlists, watch progress, favorites and watchlist sync across your devices through your private iCloud account. The video catalog itself is fetched on each device and isn’t uploaded."
+        } else {
+            "iCloud sync is not enabled in this TeamPlay build. Playlists, progress and favorites stay on this device until a TeamPlay iCloud container is registered."
+        }
     }
 }
 
@@ -68,15 +72,22 @@ enum CloudSyncStatusText {
             if let coordinator {
                 let status = coordinator.status
                 Section {
-                    HStack {
-                        Label("iCloud Sync", systemImage: iconName(for: status))
-                        Spacer()
-                        Text(CloudSyncStatusText.accountDescription(status.account))
+                    if LumeApp.isCloudKitSyncConfigured {
+                        HStack {
+                            Label("iCloud Sync", systemImage: iconName(for: status))
+                            Spacer()
+                            Text(CloudSyncStatusText.accountDescription(status.account))
+                                .foregroundStyle(.secondary)
+                        }
+                        CloudSyncStatusText.detail(for: status)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Label("iCloud Sync", systemImage: "icloud.slash")
+                        Text("Off — local only on this device")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    CloudSyncStatusText.detail(for: status)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 } header: {
                     Text("iCloud")
                 } footer: {

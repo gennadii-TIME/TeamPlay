@@ -22,13 +22,8 @@ if [[ -n "${TEAMPLAY_DEVELOPMENT_TEAM:-}" ]]; then
   )
 fi
 
-# macOS CloudKit entitlements reference upstream iCloud.bilipp.Lume; for local compile/run
-# use a sandbox-only entitlements file when TEAMPLAY_MACOS_ENTITLEMENTS is set.
-MACOS_EXTRA=()
-if [[ -n "${TEAMPLAY_MACOS_ENTITLEMENTS:-}" ]]; then
-  MACOS_EXTRA+=("CODE_SIGN_ENTITLEMENTS=${TEAMPLAY_MACOS_ENTITLEMENTS}")
-fi
-
+# CloudKit is disabled in Lume.entitlements / LumeApp.isCloudKitSyncConfigured until
+# a TeamPlay iCloud container is registered. No temporary entitlements override needed.
 xcodebuild -version | tee "$LOG_DIR/xcode-version.txt"
 
 # Prefer device names present on current Xcode; override via TEAMPLAY_*_DEST.
@@ -48,17 +43,13 @@ for i in "${!destinations[@]}"; do
   dest="${destinations[$i]}"
   log="$LOG_DIR/build-${name}.log"
   echo "=== Building $name ($dest) ===" | tee "$log"
-  extras=("${EXTRA_BUILD_FLAGS[@]}")
-  if [[ "$name" == "macOS" && ${#MACOS_EXTRA[@]} -gt 0 ]]; then
-    extras+=("${MACOS_EXTRA[@]}")
-  fi
   if xcodebuild build \
       -project Lume.xcodeproj \
       -scheme Lume \
       -destination "$dest" \
       -clonedSourcePackagesDirPath "$SPM" \
       -derivedDataPath "$DD" \
-      "${extras[@]}" \
+      "${EXTRA_BUILD_FLAGS[@]}" \
       >>"$log" 2>&1; then
     echo "OK $name" | tee -a "$log"
   else
