@@ -11,6 +11,8 @@
 Private Mac worker `MacBook-Air-M5` was online but registered only for
 `gennadii-TIME/juplite`, not TeamPlay — not usable for this repo’s `xcodebuild`.
 
+Dedicated build attempt ([Mac Xcode Lume build](bc-5fce08f0-f169-5db1-a992-b5037100ea5f)) also ran on Linux without Xcode; multi-platform `xcodebuild` and screenshots were not attempted there.
+
 ## Upstream pins
 
 See `LUME_UPSTREAM_COMMIT.txt` / `LUMEENGINE_UPSTREAM_COMMIT.txt`.
