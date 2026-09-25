@@ -1,0 +1,63 @@
+** TEST SUCCEEDED **
+Test case 'DemoHLSM3UFlowTests.testAddDemoHLSPlaylistAndPlayLiveChannel()' passed on 'Clone 1 of iPhone 17 Pro - LumeUITests-Runner (94821)' (62.180 seconds)
+--- tail ---
+
+CopyAndPreserveArchs /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/LumeUITests-Runner (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/XCTRunner -output /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/LumeUITests-Runner -extract arm64
+
+Copy /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PkgInfo /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/PkgInfo (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/PkgInfo /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app
+
+CopyPlistFile /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/Info.plist /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/Info.plist (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    builtin-copyPlist --validate --convert xml1 --macro-expansion WRAPPEDPRODUCTNAME LumeUITests-Runner --macro-expansion WRAPPEDPRODUCTBUNDLEIDENTIFIER time.teamplay.uitests.xctrunner --macro-expansion TESTPRODUCTNAME LumeUITests --macro-expansion TESTPRODUCTBUNDLEIDENTIFIER time.teamplay.uitests --copy-value UIDeviceFamily /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest/Info.plist --outdir /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app -- /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/Info.plist
+
+CodeSign /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest
+
+CodeSign /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app
+/tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app: replacing existing signature
+
+RegisterExecutionPolicyException /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    builtin-RegisterExecutionPolicyException /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest
+
+Touch /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest (in target 'LumeUITests' from project 'Lume')
+    cd /Users/gennadiistepanov/TeamPlay
+    /usr/bin/touch -c /tmp/teamplay-dd-uitest/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest
+
+PruneExplicitPrecompiledModules /tmp/teamplay-dd-uitest/Build/Intermediates.noindex/ExplicitPrecompiledModules
+
+PruneExplicitPrecompiledModules /tmp/teamplay-dd-uitest/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+PruneExplicitPrecompiledModules /tmp/teamplay-dd-uitest/SDKExplicitPrecompiledModules
+
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'Lume' from project 'Lume')
+note: Run script build phase 'Inject .env secrets' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Lume' from project 'Lume')
+note: Run script build phase 'Fix Embedded Framework CFBundleIdentifier' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Lume' from project 'Lume')
+2026-09-25 22:45:14.220 xcodebuild[91443:7187885] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-09-25 22:45:14.220 xcodebuild[91443:7187885] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-09-25 22:46:28.685 xcodebuild[91443:7187885] [MT] IDETestOperationsObserverDebug: 102.357 elapsed -- Testing started completed.
+2026-09-25 22:46:28.686 xcodebuild[91443:7187885] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-25 22:46:28.686 xcodebuild[91443:7187885] [MT] IDETestOperationsObserverDebug: 102.357 sec, +102.357 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/teamplay-dd-uitest/Logs/Test/Test-Lume-2026.09.25_22-42-52-+0300.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started
+Test suite 'DemoHLSM3UFlowTests' started on 'Clone 1 of iPhone 17 Pro - LumeUITests-Runner (94821)'
+Test case 'DemoHLSM3UFlowTests.testAddDemoHLSPlaylistAndPlayLiveChannel()' passed on 'Clone 1 of iPhone 17 Pro - LumeUITests-Runner (94821)' (62.180 seconds)
+UITEST_EXIT=0

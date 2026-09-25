@@ -17,7 +17,7 @@ final class DemoHLSM3UFlowTests: XCTestCase {
     private let playlistName = "Demo HLS"
     private let playlistURLCandidates = [
         "http://127.0.0.1:8766/demo.m3u",
-        "https://raw.githubusercontent.com/gennadii-TIME/TeamPlay/cursor/demo-hls-m3u-ui-test-47ed/LumeUITests/Fixtures/demo.m3u",
+        "https://raw.githubusercontent.com/gennadii-TIME/TeamPlay/cursor/teamplay-lume-base-8341/LumeUITests/Fixtures/demo.m3u",
     ]
 
     override func setUpWithError() throws {

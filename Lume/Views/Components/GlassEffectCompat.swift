@@ -25,28 +25,43 @@ extension View {
     /// Applies a Liquid Glass effect on OS 26+, falling back to a system
     /// material on earlier systems. A tinted style falls back to a solid fill
     /// of the tint colour so focus/emphasis stays readable.
+    ///
+    /// visionOS does not expose `glassEffect` / `Glass` (API unavailable), so
+    /// it always uses the material fallback even on visionOS 26+.
     @ViewBuilder
     func glassEffectCompat(_ style: GlassEffectStyle = .regular, in shape: some Shape) -> some View {
-        if #available(iOS 26, tvOS 26, macOS 26, visionOS 26, *) {
-            glassEffect(style.resolvedGlass, in: shape)
-        } else {
-            switch style {
-            case let .tintedInteractive(color):
-                background(color, in: shape)
-            case .regular, .regularInteractive:
-                background(.regularMaterial, in: shape)
+        #if os(visionOS)
+            glassEffectMaterialFallback(style, in: shape)
+        #else
+            if #available(iOS 26, tvOS 26, macOS 26, *) {
+                glassEffect(style.resolvedGlass, in: shape)
+            } else {
+                glassEffectMaterialFallback(style, in: shape)
             }
+        #endif
+    }
+
+    @ViewBuilder
+    private func glassEffectMaterialFallback(_ style: GlassEffectStyle, in shape: some Shape) -> some View {
+        switch style {
+        case let .tintedInteractive(color):
+            background(color, in: shape)
+        case .regular, .regularInteractive:
+            background(.regularMaterial, in: shape)
         }
     }
 }
 
-@available(iOS 26, tvOS 26, macOS 26, visionOS 26, *)
-private extension GlassEffectStyle {
-    var resolvedGlass: Glass {
-        switch self {
-        case .regular: .regular
-        case .regularInteractive: .regular.interactive()
-        case let .tintedInteractive(color): .regular.tint(color).interactive()
+#if !os(visionOS)
+    @available(iOS 26, tvOS 26, macOS 26, *)
+    private extension GlassEffectStyle {
+        var resolvedGlass: Glass {
+            switch self {
+            case .regular: .regular
+            case .regularInteractive: .regular.interactive()
+            case let .tintedInteractive(color): .regular.tint(color).interactive()
+            }
         }
     }
-}
+#endif
+

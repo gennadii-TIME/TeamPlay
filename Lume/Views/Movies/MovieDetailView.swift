@@ -414,7 +414,7 @@ struct MovieDetailView: View {
     private extension MovieDetailView {
         @ToolbarContentBuilder
         var toolbarContent: some ToolbarContent {
-            #if os(iOS)
+            #if os(iOS) || os(visionOS)
                 ToolbarItem(placement: .topBarLeading) {
                     GlassIconButton(systemImage: "chevron.left", accessibilityLabel: "Back") {
                         dismiss()

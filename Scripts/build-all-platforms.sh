@@ -11,14 +11,33 @@ DD="${TEAMPLAY_DERIVED_DATA:-/tmp/teamplay-dd-all}"
 LOG_DIR="${TEAMPLAY_BUILD_LOG_DIR:-$ROOT/docs/build-logs}"
 mkdir -p "$LOG_DIR" "$SPM"
 
+# Optional local signing overrides (needed on Mac hosts without upstream team CHG45F8MCL).
+# Example: TEAMPLAY_DEVELOPMENT_TEAM=7Q4F885549 ./Scripts/build-all-platforms.sh
+EXTRA_BUILD_FLAGS=()
+if [[ -n "${TEAMPLAY_DEVELOPMENT_TEAM:-}" ]]; then
+  EXTRA_BUILD_FLAGS+=(
+    -allowProvisioningUpdates
+    "DEVELOPMENT_TEAM=${TEAMPLAY_DEVELOPMENT_TEAM}"
+    CODE_SIGN_STYLE=Automatic
+  )
+fi
+
+# macOS CloudKit entitlements reference upstream iCloud.bilipp.Lume; for local compile/run
+# use a sandbox-only entitlements file when TEAMPLAY_MACOS_ENTITLEMENTS is set.
+MACOS_EXTRA=()
+if [[ -n "${TEAMPLAY_MACOS_ENTITLEMENTS:-}" ]]; then
+  MACOS_EXTRA+=("CODE_SIGN_ENTITLEMENTS=${TEAMPLAY_MACOS_ENTITLEMENTS}")
+fi
+
 xcodebuild -version | tee "$LOG_DIR/xcode-version.txt"
 
+# Prefer device names present on current Xcode; override via TEAMPLAY_*_DEST.
 destinations=(
-  "platform=tvOS Simulator,name=Apple TV 4K"
-  "platform=iOS Simulator,name=iPhone 17 Pro"
-  "platform=iOS Simulator,name=iPad Pro 13-inch (M4)"
-  "platform=macOS"
-  "platform=visionOS Simulator,name=Apple Vision Pro"
+  "${TEAMPLAY_TVOS_DEST:-platform=tvOS Simulator,name=Apple TV 4K (3rd generation)}"
+  "${TEAMPLAY_IPHONE_DEST:-platform=iOS Simulator,name=iPhone 17 Pro}"
+  "${TEAMPLAY_IPAD_DEST:-platform=iOS Simulator,name=iPad Pro 13-inch (M5)}"
+  "${TEAMPLAY_MACOS_DEST:-platform=macOS}"
+  "${TEAMPLAY_VISIONOS_DEST:-platform=visionOS Simulator,name=Apple Vision Pro}"
 )
 
 names=(tvOS iPhone iPad macOS visionOS)
@@ -29,17 +48,21 @@ for i in "${!destinations[@]}"; do
   dest="${destinations[$i]}"
   log="$LOG_DIR/build-${name}.log"
   echo "=== Building $name ($dest) ===" | tee "$log"
+  extras=("${EXTRA_BUILD_FLAGS[@]}")
+  if [[ "$name" == "macOS" && ${#MACOS_EXTRA[@]} -gt 0 ]]; then
+    extras+=("${MACOS_EXTRA[@]}")
+  fi
   if xcodebuild build \
       -project Lume.xcodeproj \
       -scheme Lume \
       -destination "$dest" \
       -clonedSourcePackagesDirPath "$SPM" \
       -derivedDataPath "$DD" \
+      "${extras[@]}" \
       >>"$log" 2>&1; then
     echo "OK $name" | tee -a "$log"
   else
     echo "FAIL $name (see $log)" | tee -a "$log"
-    # Retry with generic destination ids if named sims differ on this Mac
     failed=$((failed + 1))
   fi
 done

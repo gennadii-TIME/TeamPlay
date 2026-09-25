@@ -32,7 +32,10 @@
             // AVAudioSession there is no route observation to drive the
             // KSPlayer/VLCKit → AVPlayer handoff either — so without a player
             // the button would be inert. Show it only on the AVPlayer engine.
-            #if os(macOS)
+            // visionOS has no `AVRoutePickerView`.
+            #if os(visionOS)
+                EmptyView()
+            #elseif os(macOS)
                 if player != nil { picker }
             #else
                 picker
@@ -49,7 +52,7 @@
         }
     }
 
-    #if canImport(UIKit)
+    #if canImport(UIKit) && !os(visionOS)
         private struct RoutePicker: UIViewRepresentable {
             var player: AVPlayer?
 
@@ -64,6 +67,13 @@
             }
 
             func updateUIView(_: AVRoutePickerView, context _: Context) {}
+        }
+
+    #elseif os(visionOS)
+        /// `AVRoutePickerView` is unavailable on visionOS; hide the Cast control.
+        private struct RoutePicker: View {
+            var player: AVPlayer?
+            var body: some View { EmptyView() }
         }
 
     #elseif canImport(AppKit)

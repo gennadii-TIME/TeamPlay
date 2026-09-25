@@ -15,6 +15,9 @@
 import Foundation
 import OSLog
 import StoreKit
+#if canImport(UIKit)
+    import UIKit
+#endif
 
 @MainActor
 @Observable
@@ -158,7 +161,7 @@ final class PremiumManager {
         isWorking = true
         defer { isWorking = false }
         do {
-            let result = try await product.purchase()
+            let result = try await purchaseResult(for: product)
             switch result {
             case let .success(verification):
                 guard case let .verified(transaction) = verification else {
@@ -178,6 +181,27 @@ final class PremiumManager {
             return false
         }
     }
+
+    /// visionOS requires an explicit `UIScene` confirmation context; the
+    /// parameterless `purchase(options:)` API is unavailable there.
+    private func purchaseResult(for product: Product) async throws -> Product.PurchaseResult {
+        #if os(visionOS)
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+            else {
+                throw PurchaseSceneMissingError()
+            }
+            return try await product.purchase(confirmIn: scene)
+        #else
+            return try await product.purchase()
+        #endif
+    }
+
+    #if os(visionOS)
+        private struct PurchaseSceneMissingError: Error {}
+    #endif
 
     /// Restore purchases (App Store Review requires this for non-consumables and
     /// subscriptions). Syncs transactions, then re-reads entitlements.

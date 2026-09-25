@@ -54,7 +54,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     let subtitleCues = SubtitleCueModel()
 
     var isPipSupported: Bool {
-        pipBridge?.isSupported ?? false
+        #if os(iOS) || os(macOS) || os(tvOS)
+            pipBridge?.isSupported ?? false
+        #else
+            false
+        #endif
     }
 
     var playbackRate: Float = 1.0 {
@@ -113,7 +117,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     private(set) var displayLayer: LumeDisplayLayer?
 
     private var session: PlayerSession?
-    private var pipBridge: PictureInPictureBridge?
+    #if os(iOS) || os(macOS) || os(tvOS)
+        private var pipBridge: PictureInPictureBridge?
+    #endif
     private var mediaInfo: MediaInfo?
     private var currentMedia: PlayableMedia?
     private var eventTask: Task<Void, Never>?
@@ -183,9 +189,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
                 self.selectedSubtitleID = await session.selectedSubtitleTrackIndex.map { String($0) }
                 self.publishTracks(info: info)
                 self.publishVideoInfo(info: info)
-                if !self.isEmbedded {
-                    self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
-                }
+                #if os(iOS) || os(macOS) || os(tvOS)
+                    if !self.isEmbedded {
+                        self.pipBridge = PictureInPictureBridge(session: session, mediaInfo: info)
+                    }
+                #endif
                 // Resume position is handled by the engine via
                 // configuration.startPosition (seek-before-first-read).
                 if media.startTime > 1, !media.isLive, !info.isSeekable {
@@ -246,7 +254,9 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         eventTask = nil
         tickTask = nil
         startupTask = nil
-        pipBridge = nil
+        #if os(iOS) || os(macOS) || os(tvOS)
+            pipBridge = nil
+        #endif
         if let session {
             Task { await session.shutdown() }
         }
@@ -294,8 +304,10 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
     }
 
     func togglePictureInPicture() {
-        pipBridge?.toggle()
-        isPipActive = pipBridge?.isActive ?? false
+        #if os(iOS) || os(macOS) || os(tvOS)
+            pipBridge?.toggle()
+            isPipActive = pipBridge?.isActive ?? false
+        #endif
     }
 
     // MARK: Tracks
