@@ -43,7 +43,8 @@ struct ContentView: View {
             }
         }
         .task {
-            if CommandLine.arguments.contains("-ui-testing") {
+            if CommandLine.arguments.contains("-ui-testing"),
+               !CommandLine.arguments.contains("-ui-testing-skip-seed") {
                 seedTestPlaylist()
             }
         }

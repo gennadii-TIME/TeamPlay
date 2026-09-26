@@ -28,9 +28,39 @@ extension XCUIApplication {
     /// and the failure then surfaces as "Settings never appeared" several
     /// seconds later rather than as the missed tap it was.
     func openSettingsSheet(timeout: TimeInterval = 60) -> Bool {
-        guard tabBars.firstMatch.waitForExistence(timeout: timeout) else { return false }
+        guard waitForBrowseChrome(timeout: timeout) else { return false }
         settingsToolbarButton.tap()
         return navigationBars["Settings"].waitForExistence(timeout: timeout)
+    }
+
+    /// True when the main browse chrome is up. iPhone uses a system `TabBar`;
+    /// iPad hosts the same tabs as regular buttons in a custom top bar, so
+    /// `tabBars` alone is not enough.
+    func waitForBrowseChrome(timeout: TimeInterval = 60) -> Bool {
+        if tabBars.firstMatch.waitForExistence(timeout: min(timeout, 5)) {
+            return true
+        }
+        return buttons["Live TV"].waitForExistence(timeout: timeout)
+            || buttons["Home"].waitForExistence(timeout: timeout)
+    }
+
+    /// Opens the Live TV tab on either the system tab bar (iPhone) or the
+    /// custom top chrome (iPad).
+    func openLiveTVTab() {
+        let systemTab = tabBars.buttons["Live TV"]
+        if systemTab.waitForExistence(timeout: 2) {
+            systemTab.tap()
+            return
+        }
+        // iPadOS floating tab bar nests a Button inside a Cell; tapping the
+        // ambiguous `buttons["Live TV"]` query fails. Prefer the cell, else
+        // the first matching button.
+        let cell = cells["Live TV"]
+        if cell.waitForExistence(timeout: 5) {
+            cell.tap()
+            return
+        }
+        buttons.matching(NSPredicate(format: "label == %@", "Live TV")).element(boundBy: 0).tap()
     }
 
     /// The toolbar's playlist switcher for the playlist named `name`.

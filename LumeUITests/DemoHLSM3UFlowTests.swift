@@ -37,14 +37,29 @@ final class DemoHLSM3UFlowTests: XCTestCase {
     // MARK: - Steps
 
     private func launchAndOpenAddForm(_ app: XCUIApplication) {
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = [
+            "-ui-testing",
+            // Empty catalog so LoginView's add form is the first screen (avoids
+            // iPad nested Settings→Add Playlist sheet flakiness and the free-tier
+            // second-playlist paywall when a Test Playlist seed is already present).
+            "-ui-testing-skip-seed",
+            "-premium.debugForcePremium", "YES",
+        ]
         app.launch()
 
-        if app.tabBars.firstMatch.waitForExistence(timeout: 5) {
-            XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
-            let addButton = app.buttons["Add Playlist"]
-            XCTAssertTrue(addButton.waitForExistence(timeout: 10))
-            addButton.tap()
+        let m3uOnLaunch = app.buttons["M3U"]
+        if m3uOnLaunch.waitForExistence(timeout: 15) {
+            return
+        }
+
+        XCTAssertTrue(app.openSettingsSheet(), "Settings sheet did not open")
+        let addButton = app.buttons["Add Playlist"]
+        XCTAssertTrue(app.scrollUntilExists(addButton), "Add Playlist row not found")
+        addButton.tap()
+
+        if app.staticTexts["Unlock TeamPlay Premium"].waitForExistence(timeout: 3)
+            || app.navigationBars["TeamPlay Premium"].waitForExistence(timeout: 1) {
+            XCTFail("Add Playlist opened the paywall instead of the M3U form")
         }
     }
 
@@ -80,7 +95,7 @@ final class DemoHLSM3UFlowTests: XCTestCase {
         }
 
         XCTAssertTrue(
-            app.tabBars.firstMatch.waitForExistence(timeout: 60),
+            app.waitForBrowseChrome(timeout: 60),
             "Catalog UI did not appear after adding the playlist.\n\(app.debugDescription)"
         )
     }
@@ -93,22 +108,25 @@ final class DemoHLSM3UFlowTests: XCTestCase {
             from.press(forDuration: 0.1, thenDragTo: target)
             XCTAssertTrue(settingsNav.waitForNonExistence(timeout: 10), "Settings sheet did not dismiss")
         }
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 30), "Tab bar not visible")
+        XCTAssertTrue(app.waitForBrowseChrome(timeout: 30), "Browse chrome not visible")
     }
 
     private func activateDemoPlaylist(_ app: XCUIApplication) {
-        app.tabBars.buttons["Live TV"].tap()
+        app.openLiveTVTab()
+        // With `-ui-testing-skip-seed` there is only Demo HLS — the switcher is
+        // hidden when a single playlist is active (see LibraryToolbar).
         let switcher = app.playlistSwitcher(named: "Test Playlist")
-        XCTAssertTrue(switcher.waitForExistence(timeout: 20), "Playlist switcher not found")
-        switcher.tap()
-        let item = app.buttons[playlistName].firstMatch
-        XCTAssertTrue(item.waitForExistence(timeout: 10), "Playlist switcher didn't list \(playlistName)")
-        item.tap()
-        let switchOverlay = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Switching to")
-        ).firstMatch
-        if switchOverlay.waitForExistence(timeout: 5) {
-            _ = switchOverlay.waitForNonExistence(timeout: 60)
+        if switcher.waitForExistence(timeout: 5) {
+            switcher.tap()
+            let item = app.buttons[playlistName].firstMatch
+            XCTAssertTrue(item.waitForExistence(timeout: 10), "Playlist switcher didn't list \(playlistName)")
+            item.tap()
+            let switchOverlay = app.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@", "Switching to")
+            ).firstMatch
+            if switchOverlay.waitForExistence(timeout: 5) {
+                _ = switchOverlay.waitForNonExistence(timeout: 60)
+            }
         }
     }
 
@@ -136,7 +154,7 @@ final class DemoHLSM3UFlowTests: XCTestCase {
     }
 
     private func attemptPlayFirstLiveChannel(_ app: XCUIApplication) {
-        app.tabBars.buttons["Live TV"].tap()
+        app.openLiveTVTab()
 
         if app.staticTexts["No Channels"].waitForExistence(timeout: 10) {
             return XCTFail("Live TV is empty after syncing Demo HLS.\n\(app.debugDescription)")
