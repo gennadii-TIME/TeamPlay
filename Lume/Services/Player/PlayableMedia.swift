@@ -36,6 +36,13 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
     /// and `id` stay clean, and a restored window carries no credential-bearing
     /// MRL into a deep link, a Cast payload or a download task description.
     let httpHeaders: [String: String]?
+    /// Absolute wall-clock start of a live-timeshift / archive clip (`nil` for
+    /// ordinary VOD / live). Used so −10/+10 and scrub can map
+    /// `player.currentTime` back to an absolute `Date` without relying on the
+    /// short live HLS window.
+    let archiveWindowStart: Date?
+    /// Absolute wall-clock end used when the Flussonic URL was built.
+    let archiveWindowEnd: Date?
 
     nonisolated init(
         id: String,
@@ -47,7 +54,9 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
         startTime: TimeInterval,
         contentRef: ContentRef,
         channelScope: LiveChannelScope? = nil,
-        httpHeaders: [String: String]? = nil
+        httpHeaders: [String: String]? = nil,
+        archiveWindowStart: Date? = nil,
+        archiveWindowEnd: Date? = nil
     ) {
         self.id = id
         self.url = url
@@ -59,10 +68,33 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
         self.contentRef = contentRef
         self.channelScope = channelScope
         self.httpHeaders = httpHeaders
+        self.archiveWindowStart = archiveWindowStart
+        self.archiveWindowEnd = archiveWindowEnd
     }
 
     var isLive: Bool {
         kind == .live
+    }
+
+    /// Full playback-source identity for media swaps. Changes when the stream
+    /// URL or archive window bounds change — even if `id` collides — so the
+    /// host always replaces the player item when the source actually changed.
+    var playbackSourceFingerprint: String {
+        let start = archiveWindowStart.map { String(Int($0.timeIntervalSince1970)) } ?? "-"
+        let end = archiveWindowEnd.map { String(Int($0.timeIntervalSince1970)) } ?? "-"
+        let kindKey: String = {
+            switch kind {
+            case .live: return "live"
+            case .vod: return "vod"
+            }
+        }()
+        return "\(url.absoluteString)|\(start)|\(end)|\(kindKey)"
+    }
+
+    /// Catch-up / archive playback built by `PlayableMedia.catchup` — VOD with a
+    /// live `contentRef` and an id prefixed `catchup-`.
+    var isCatchup: Bool {
+        id.hasPrefix("catchup-")
     }
 
     /// A copy of this stream that resumes at `position` seconds. Same identity,
@@ -82,7 +114,9 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             startTime: position,
             contentRef: contentRef,
             channelScope: channelScope,
-            httpHeaders: httpHeaders
+            httpHeaders: httpHeaders,
+            archiveWindowStart: archiveWindowStart,
+            archiveWindowEnd: archiveWindowEnd
         )
     }
 
@@ -103,7 +137,9 @@ struct PlayableMedia: Identifiable, Hashable, Codable {
             startTime: startTime,
             contentRef: contentRef,
             channelScope: channelScope,
-            httpHeaders: httpHeaders
+            httpHeaders: httpHeaders,
+            archiveWindowStart: archiveWindowStart,
+            archiveWindowEnd: archiveWindowEnd
         )
     }
 }
@@ -279,22 +315,105 @@ extension PlayableMedia {
         )
     }
 
+    /// Whether this channel may advertise Archive in UI (buildable catch-up).
+    static func canOfferCatchup(stream: LiveStream) -> Bool {
+        guard stream.tvArchive > 0, stream.tvArchiveDuration > 0 else { return false }
+        if let directURL = stream.directURL {
+            return M3UCatchupURLBuilder.canBuild(
+                mode: stream.catchupMode,
+                source: stream.catchupSource,
+                streamURL: directURL
+            )
+        }
+        return true
+    }
+
     /// Whether a programme that started at `start` is still replayable from the
     /// channel's catch-up archive at `now`. Mirrors the guards in
     /// `catchup(stream:...)` so UI can offer the action only where construction
-    /// would succeed: catch-up needs Xtream credentials (no direct URL), an
-    /// advertised archive, and a start inside the archive window.
+    /// would succeed: an advertised archive, a start inside the archive window,
+    /// and either Xtream credentials or a known m3u catch-up scheme that builds.
     static func isCatchupAvailable(stream: LiveStream, start: Date, now: Date) -> Bool {
-        guard stream.tvArchive > 0, stream.directURL == nil else { return false }
-        let archiveDays = max(1, stream.tvArchiveDuration)
-        return start >= now.addingTimeInterval(-TimeInterval(archiveDays) * 86400)
+        guard stream.tvArchive > 0 else {
+            CatchupDiagnostics.logAvailability(
+                channelName: stream.name,
+                mode: stream.catchupMode,
+                hasSource: stream.catchupSource != nil,
+                tvArchive: stream.tvArchive,
+                archiveDays: stream.tvArchiveDuration,
+                start: start,
+                end: start,
+                available: false,
+                reason: "tvArchive=0"
+            )
+            return false
+        }
+        let archiveDays = stream.tvArchiveDuration
+        guard archiveDays > 0 else {
+            CatchupDiagnostics.logAvailability(
+                channelName: stream.name,
+                mode: stream.catchupMode,
+                hasSource: stream.catchupSource != nil,
+                tvArchive: stream.tvArchive,
+                archiveDays: archiveDays,
+                start: start,
+                end: start,
+                available: false,
+                reason: "tvg-rec=0"
+            )
+            return false
+        }
+        guard start >= now.addingTimeInterval(-TimeInterval(archiveDays) * 86400) else {
+            CatchupDiagnostics.logAvailability(
+                channelName: stream.name,
+                mode: stream.catchupMode,
+                hasSource: stream.catchupSource != nil,
+                tvArchive: stream.tvArchive,
+                archiveDays: archiveDays,
+                start: start,
+                end: start,
+                available: false,
+                reason: "outside-archive-window"
+            )
+            return false
+        }
+        if let directURL = stream.directURL {
+            let ok = M3UCatchupURLBuilder.canBuild(
+                mode: stream.catchupMode,
+                source: stream.catchupSource,
+                streamURL: directURL
+            )
+            CatchupDiagnostics.logAvailability(
+                channelName: stream.name,
+                mode: stream.catchupMode,
+                hasSource: stream.catchupSource != nil,
+                tvArchive: stream.tvArchive,
+                archiveDays: archiveDays,
+                start: start,
+                end: start,
+                available: ok,
+                reason: ok ? "m3u-scheme-ok" : "m3u-scheme-unbuildable"
+            )
+            return ok
+        }
+        CatchupDiagnostics.logAvailability(
+            channelName: stream.name,
+            mode: stream.catchupMode,
+            hasSource: stream.catchupSource != nil,
+            tvArchive: stream.tvArchive,
+            archiveDays: archiveDays,
+            start: start,
+            end: start,
+            available: true,
+            reason: "xtream-panel"
+        )
+        return true
     }
 
     /// A past programme played from the channel's catch-up archive. Modelled as
     /// VOD — the archive is a finite, seekable asset, so the player gives it a
     /// scrubber rather than the live banner, and channel surfing stays disabled.
-    /// Returns `nil` for m3u streams (catch-up needs Xtream credentials) or when
-    /// the channel doesn't advertise an archive.
+    /// Returns `nil` when the channel doesn't advertise a buildable archive.
     static func catchup(
         stream: LiveStream,
         playlist: Playlist,
@@ -303,11 +422,69 @@ extension PlayableMedia {
         end: Date,
         client: XtreamClient = XtreamClient()
     ) -> PlayableMedia? {
-        guard stream.tvArchive > 0, stream.directURL == nil else { return nil }
-        let durationMinutes = max(1, Int((end.timeIntervalSince(start) / 60).rounded(.up)))
-        guard let url = client.buildCatchupURL(
-            for: stream, playlist: playlist, start: start, durationMinutes: durationMinutes
-        ) else { return nil }
+        guard stream.tvArchive > 0 else {
+            CatchupDiagnostics.logBuildResult(
+                channelName: stream.name,
+                mode: stream.catchupMode,
+                hasSource: stream.catchupSource != nil,
+                success: false,
+                mediaKind: "none",
+                reason: "tvArchive=0",
+                safeURL: "none"
+            )
+            return nil
+        }
+
+        let url: URL
+        if let directURL = stream.directURL {
+            guard let built = M3UCatchupURLBuilder.build(
+                streamURL: directURL,
+                mode: stream.catchupMode,
+                source: stream.catchupSource,
+                start: start,
+                end: end
+            ) else {
+                CatchupDiagnostics.logBuildResult(
+                    channelName: stream.name,
+                    mode: stream.catchupMode,
+                    hasSource: stream.catchupSource != nil,
+                    success: false,
+                    mediaKind: "none",
+                    reason: "m3u-build-failed",
+                    safeURL: CatchupDiagnostics.safeURLDescription(directURL)
+                )
+                return nil
+            }
+            url = built
+        } else {
+            let durationMinutes = max(1, Int((end.timeIntervalSince(start) / 60).rounded(.up)))
+            guard let built = client.buildCatchupURL(
+                for: stream, playlist: playlist, start: start, durationMinutes: durationMinutes
+            ) else {
+                CatchupDiagnostics.logBuildResult(
+                    channelName: stream.name,
+                    mode: "xtream",
+                    hasSource: false,
+                    success: false,
+                    mediaKind: "none",
+                    reason: "xtream-build-failed",
+                    safeURL: CatchupDiagnostics.safeURLDescription(playlist.serverURL)
+                )
+                return nil
+            }
+            url = built
+        }
+
+        CatchupDiagnostics.logBuildResult(
+            channelName: stream.name,
+            mode: stream.catchupMode ?? (stream.directURL == nil ? "xtream" : nil),
+            hasSource: stream.catchupSource != nil,
+            success: true,
+            mediaKind: "catchup",
+            reason: "ok",
+            safeURL: CatchupDiagnostics.safeURLDescription(url.absoluteString)
+        )
+
         return PlayableMedia(
             id: "catchup-\(stream.id)-\(Int(start.timeIntervalSince1970))",
             url: url,
@@ -316,7 +493,48 @@ extension PlayableMedia {
             posterURL: URL(string: stream.streamIcon ?? ""),
             kind: .vod,
             startTime: 0,
-            contentRef: .live(stream.id)
+            contentRef: .live(stream.id),
+            httpHeaders: authHeaders(for: playlist),
+            archiveWindowStart: start,
+            archiveWindowEnd: end
+        )
+    }
+
+    /// Live rewind / Start Over: same Flussonic (or other) catch-up URL as
+    /// `catchup`, but tagged with `LiveTimeshift.timeshiftIDPrefix` so the OSD
+    /// can auto-return to live when the clip ends and badge it as timeshift.
+    /// `start`/`end` are absolute `Date`s (XMLTV offset already applied); the
+    /// builder converts them to Unix UTC for the URL.
+    static func timeshift(
+        stream: LiveStream,
+        playlist: Playlist,
+        programTitle: String?,
+        start: Date,
+        end: Date,
+        client: XtreamClient = XtreamClient()
+    ) -> PlayableMedia? {
+        guard let media = catchup(
+            stream: stream,
+            playlist: playlist,
+            programTitle: programTitle ?? stream.name,
+            start: start,
+            end: end,
+            client: client
+        ) else { return nil }
+
+        return PlayableMedia(
+            id: "\(LiveTimeshift.timeshiftIDPrefix)\(stream.id)-\(Int(start.timeIntervalSince1970))",
+            url: media.url,
+            title: media.title,
+            subtitle: programTitle ?? media.subtitle,
+            posterURL: media.posterURL,
+            kind: .vod,
+            startTime: 0,
+            contentRef: media.contentRef,
+            channelScope: media.channelScope,
+            httpHeaders: media.httpHeaders,
+            archiveWindowStart: start,
+            archiveWindowEnd: end
         )
     }
 }

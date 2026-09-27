@@ -356,7 +356,11 @@ final class LumeEngineCoordinator: NSObject, ObservableObject {
         }
         configuration.hardwareDecode = options.hardwareDecode ? .videoToolbox : .software
         configuration.deinterlace = Self.deinterlacing(for: options)
-        configuration.bufferTarget = Double(media.isLive ? options.liveBuffer : options.vodBuffer) / 1000
+        configuration.bufferTarget = PlayerSettings.PlaybackBufferPreference.lumeBufferTargetSeconds(
+            isLive: media.isLive,
+            automaticLiveMs: options.liveBuffer,
+            automaticVODMs: options.vodBuffer
+        )
         configuration.videoQueueDepth = options.videoQueueDepth
         configuration.audioQueueDepth = options.audioQueueDepth
         // A Multi-View tile opens with an audio lane only if it is the audible

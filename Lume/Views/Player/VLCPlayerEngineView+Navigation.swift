@@ -31,6 +31,42 @@ import SwiftUI
                 showControls: showControls
             )
         }
+
+        func handleChannelSurfInput(
+            _ direction: MoveCommandDirection,
+            source: TVChannelSurfInputSource
+        ) {
+            let surfDirection: TVChannelSurfDirection
+            switch direction {
+            case .up: surfDirection = .up
+            case .down: surfDirection = .down
+            default: return
+            }
+            // Heal a stuck `.controls` phase after OSD already hid (missed
+            // noteControlsClosed) so surfing is not permanently blocked.
+            if !isControlsVisible, controlSession.phase == .controls {
+                controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+            }
+            let gate = TVChannelSurfGate(
+                isOSDVisible: isControlsVisible,
+                hasOpenPanel: isPanelOpen || isChannelBrowserOpen || isProgramGuideOpen,
+                isScrubbing: controlSession.isScrubbing || controlSession.isCommitInFlight,
+                allowsChannelSurf: controlSession.allowsChannelSurf(
+                    controlsVisible: isControlsVisible,
+                    mediaIsLive: media.isLive
+                )
+            )
+            let decision = surfRouter.evaluate(
+                direction: surfDirection,
+                source: source,
+                gate: gate,
+                phase: controlSession.phase.rawValue,
+                focusTarget: isControlsVisible ? "osd" : "catcher",
+                channelID: media.id
+            )
+            guard decision.accepted else { return }
+            switchLiveChannel(direction)
+        }
     }
 
 #else

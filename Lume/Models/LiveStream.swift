@@ -61,6 +61,12 @@ final class LiveStream {
     /// credentials and `streamId` (which is a derived hash for m3u sources).
     var directURL: String?
 
+    /// Normalised m3u `catchup` mode (`shift`, `default`, `flussonic`, …).
+    /// `nil` for Xtream channels and for m3u entries without a known scheme.
+    var catchupMode: String?
+    /// Optional m3u `catchup-source` template used by `append` / `default`.
+    var catchupSource: String?
+
     var isFavorite: Bool = false
     var lastWatchedDate: Date?
     /// Hidden channels are kept in the store but excluded from browsing. Toggled

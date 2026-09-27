@@ -52,6 +52,58 @@ struct M3UParserTests {
         #expect(entry.url == "http://example.com/live/1.ts")
     }
 
+    @Test func `parses catchup attributes`() async throws {
+        let playlist = """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="chan.1" catchup="flussonic" catchup-days="7" catchup-source="?utc=${start}",Archive Chan
+        http://example.com/live/1.m3u8
+        """
+        let entry = try #require(await parseAll(playlist).entries.first)
+        #expect(entry.catchup == "flussonic")
+        #expect(entry.catchupDays == 7)
+        #expect(entry.catchupSource == "?utc=${start}")
+    }
+
+    @Test func `parses catchup-type alias and header catchup defaults`() async throws {
+        let playlist = """
+        #EXTM3U catchup-type="shift" catchup-days="5"
+        #EXTINF:-1 tvg-id="chan.1",Inherited Chan
+        http://example.com/live/1.ts
+        #EXTINF:-1 tvg-id="chan.2" catchup="flussonic" catchup-days="2",Override Chan
+        http://example.com/ch/index.m3u8
+        """
+        let (entries, header) = try await parseAll(playlist)
+        #expect(header?.catchup == "shift")
+        #expect(header?.catchupDays == 5)
+        let inherited = try #require(entries.first)
+        #expect(inherited.catchup == "shift")
+        #expect(inherited.catchupDays == 5)
+        let overridden = try #require(entries.dropFirst().first)
+        #expect(overridden.catchup == "flussonic")
+        #expect(overridden.catchupDays == 2)
+    }
+
+    @Test func `parses tvg-rec as archive days without catchup type`() async throws {
+        let playlist = """
+        #EXTM3U url-tvg="http://example.com/epg.xml.gz"
+        #EXTINF:0 tvg-id="ch001" tvg-name="One" tvg-rec="7",One HD
+        #EXTGRP:Federal
+        http://example.com/ch001/mono.m3u8?token=abc
+        #EXTINF:0 tvg-id="ch002" tvg-rec="0",No Archive
+        http://example.com/ch002/mono.m3u8?token=abc
+        """
+        let (entries, header) = try await parseAll(playlist)
+        #expect(header?.epgURL == "http://example.com/epg.xml.gz")
+        #expect(entries.count == 2)
+        let arch = try #require(entries.first)
+        #expect(arch.catchup == nil)
+        #expect(arch.catchupDays == 7)
+        #expect(arch.group == "Federal")
+        #expect(arch.url.contains("mono.m3u8"))
+        let none = try #require(entries.dropFirst().first)
+        #expect(none.catchupDays == 0)
+    }
+
     @Test func `attribute values may contain commas`() async throws {
         let playlist = """
         #EXTM3U

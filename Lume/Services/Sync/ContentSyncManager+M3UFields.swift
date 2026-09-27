@@ -139,6 +139,20 @@ extension ContentSyncManager {
         if stream.epgChannelId != entry.tvgId { stream.epgChannelId = entry.tvgId }
         if stream.directURL != entry.url { stream.directURL = entry.url }
         if stream.categoryId != categoryId { stream.categoryId = categoryId }
+
+        // Catch-up: only advertise archive when the scheme is one we can build.
+        // Unknown modes clear the fields so the EPG never offers a dead replay.
+        let catchup = M3UCatchupURLBuilder.capability(
+            catchup: entry.catchup,
+            catchupSource: entry.catchupSource,
+            catchupDays: entry.catchupDays,
+            streamURL: entry.url
+        )
+        let archiveFlag = catchup.hasArchive ? 1 : 0
+        if stream.tvArchive != archiveFlag { stream.tvArchive = archiveFlag }
+        if stream.tvArchiveDuration != catchup.days { stream.tvArchiveDuration = catchup.days }
+        if stream.catchupMode != catchup.mode { stream.catchupMode = catchup.mode }
+        if stream.catchupSource != catchup.source { stream.catchupSource = catchup.source }
     }
 
     /// Copies the provider-owned fields of an m3u entry onto an existing or

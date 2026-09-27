@@ -87,8 +87,26 @@ fix_bundle_id() {
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $fixed" "$plist"
             BUNDLE_ID_PATCHED=1
             echo "[fix-ksplayer] CFBundleIdentifier patched in $plist ($current -> $fixed)"
+            current=$fixed
             ;;
     esac
+    # Local SPM products (e.g. LumeEngine) can inherit the app's PRODUCT_BUNDLE_IDENTIFIER.
+    # tvOS install rejects a parent/child with the same id (DuplicateIdentifier).
+    app_id="${PRODUCT_BUNDLE_IDENTIFIER:-}"
+    if [ -n "$app_id" ] && [ "$current" = "$app_id" ]; then
+        fw_leaf=$(basename "$(dirname "$plist")" .framework)
+        # plist may live at Framework.framework/Info.plist or …/Resources/Info.plist
+        case "$plist" in
+            */Resources/Info.plist)
+                fw_leaf=$(basename "$(dirname "$(dirname "$plist")")" .framework)
+                ;;
+        esac
+        fixed="${app_id}.${fw_leaf}"
+        chmod u+w "$plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $fixed" "$plist"
+        BUNDLE_ID_PATCHED=1
+        echo "[fix-ksplayer] CFBundleIdentifier uniqued in $plist ($current -> $fixed)"
+    fi
 }
 
 resign_framework() {

@@ -224,7 +224,20 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
             AVURLAsset(url: media.url)
         }
         let newItem = AVPlayerItem(asset: asset)
-        newItem.preferredForwardBufferDuration = media.isLive ? 4 : 8
+        // Automatic → 0 lets AVFoundation choose its own forward buffer.
+        // A fixed Playback Buffer preference overrides on the next load only.
+        if let seconds = PlayerSettings.PlaybackBufferPreference.resolve().seconds {
+            newItem.preferredForwardBufferDuration = seconds
+        } else {
+            newItem.preferredForwardBufferDuration = 0
+        }
+        // No artificial peak-bitrate / max-resolution clamp — let AVFoundation
+        // pick the top viable HLS variant.
+        newItem.preferredPeakBitRate = 0
+        newItem.preferredMaximumResolution = .zero
+        if #available(iOS 15.0, tvOS 15.0, macOS 12.0, *) {
+            newItem.preferredPeakBitRateForExpensiveNetworks = 0
+        }
         item = newItem
 
         attachItemObservers(to: newItem)
@@ -518,8 +531,44 @@ final class AVPlayerCoordinator: NSObject, ObservableObject {
             if videoInfo != nil { videoInfo = nil }
             return
         }
-        let info = PlayerVideoInfo(width: width, height: height, fps: 0, codec: nil)
+
+        var codec: String?
+        var fps: Double = 0
+        if let item {
+            for track in item.tracks where track.assetTrack?.mediaType == .video {
+                if track.currentVideoFrameRate > 0 {
+                    fps = Double(track.currentVideoFrameRate)
+                }
+                if let assetTrack = track.assetTrack {
+                    for format in assetTrack.formatDescriptions {
+                        let desc = format as! CMFormatDescription
+                        codec = Self.codecName(from: desc) ?? codec
+                    }
+                }
+            }
+        }
+
+        let info = PlayerVideoInfo(width: width, height: height, fps: fps, codec: codec)
         if info != videoInfo { videoInfo = info }
+    }
+
+    private static func codecName(from format: CMFormatDescription) -> String? {
+        switch CMFormatDescriptionGetMediaSubType(format) {
+        case kCMVideoCodecType_HEVC: return "HEVC"
+        case kCMVideoCodecType_H264: return "H264"
+        case kCMVideoCodecType_AppleProRes422, kCMVideoCodecType_AppleProRes4444: return "ProRes"
+        default:
+            let code = CMFormatDescriptionGetMediaSubType(format)
+            let bytes = [
+                UInt8((code >> 24) & 0xFF),
+                UInt8((code >> 16) & 0xFF),
+                UInt8((code >> 8) & 0xFF),
+                UInt8(code & 0xFF)
+            ]
+            let printable = bytes.filter { $0 >= 0x20 && $0 < 0x7F }.map { Character(UnicodeScalar($0)) }
+            let fourCC = String(printable).trimmingCharacters(in: .whitespaces)
+            return fourCC.isEmpty ? nil : fourCC.uppercased()
+        }
     }
 }
 

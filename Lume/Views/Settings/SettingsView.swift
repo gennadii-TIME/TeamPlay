@@ -38,9 +38,13 @@ struct SettingsView: View {
     #if os(tvOS)
         @AppStorage(PlayerSettings.tvRemoteSwipesKey)
         var tvRemoteSwipes = PlayerSettings.tvRemoteSwipesDefault
+        @AppStorage(PlayerSettings.OSD.hideDelaySecondsKey)
+        var osdHideDelaySeconds = PlayerSettings.OSD.hideDelaySecondsDefault
     #endif
     @AppStorage(PlayerSettings.Playback.autoPlayNextKey)
     var autoPlayNext = PlayerSettings.Playback.autoPlayNextDefault
+    @AppStorage(PlayerSettings.PlaybackBufferPreference.storageKey)
+    var playbackBufferRaw: String = PlayerSettings.PlaybackBufferPreference.default.rawValue
     #if os(tvOS)
         /// tvOS only: off tvOS the transport row carries an always-available
         /// Next Episode button, so `PlayerNextUpOverlay`'s outro-armed one —
@@ -545,6 +549,7 @@ struct SettingsView: View {
                         }
                     case .profiles: TVProfilesSettingsView()
                     case .home: tvHomeLayoutDetail
+                    case .interface: tvInterfaceDetail
                     case .sports: TVSportsSettingsPane()
                     case .epg: EPGSettingsView()
                     case .search: tvSearchDetail

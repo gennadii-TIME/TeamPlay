@@ -143,6 +143,26 @@
             )
             return (try? context.fetch(descriptor)) ?? []
         }
+
+        /// Local guide slice covering `[from, to]` for scrub-preview programme
+        /// lookup. Sorted by start; callers must not hit the network per nudge.
+        static func epgListings(
+            channelId: String?,
+            coveringFrom from: Date,
+            to: Date,
+            in context: ModelContext
+        ) -> [EPGListing] {
+            guard let channelId, !channelId.isEmpty else { return [] }
+            let windowStart = min(from, to)
+            let windowEnd = max(from, to)
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate {
+                    $0.channelId == channelId && $0.end > windowStart && $0.start < windowEnd
+                },
+                sortBy: [SortDescriptor(\.start)]
+            )
+            return (try? context.fetch(descriptor)) ?? []
+        }
     }
 
 #endif

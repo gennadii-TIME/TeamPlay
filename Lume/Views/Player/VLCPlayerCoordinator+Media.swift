@@ -42,7 +42,13 @@ extension VLCPlayerCoordinator {
 
         // The original code set network-caching alongside the live/file caching
         // to the same value; the live and on-demand buffers keep that pairing.
-        let buffer = isLive ? options.liveBuffer : options.vodBuffer
+        // Unified Playback Buffer overrides when not Automatic; otherwise the
+        // per-engine advanced Live/On-Demand values apply.
+        let buffer = PlayerSettings.PlaybackBufferPreference.vlcCachingMilliseconds(
+            isLive: isLive,
+            automaticLiveMs: options.liveBuffer,
+            automaticVODMs: options.vodBuffer
+        )
         media.addOption(":network-caching=\(buffer)")
         media.addOption(isLive ? ":live-caching=\(buffer)" : ":file-caching=\(buffer)")
 

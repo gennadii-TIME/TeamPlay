@@ -33,6 +33,9 @@
         /// the overlay's right-hand caption and info badges. `nil` until known.
         var videoInfo: PlayerVideoInfo? { get }
 
+        /// Engine audio mute — used by timed mute; does not touch system volume.
+        var isMuted: Bool { get set }
+
         /// Selectable audio tracks (empty / single-entry hides the menu).
         var audioTrackOptions: [PlayerTrackOption] { get }
         /// Selectable subtitle tracks, excluding the implicit "Off" entry the

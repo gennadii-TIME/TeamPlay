@@ -155,6 +155,9 @@ final class PlaybackQoE {
         Logger.performance.log(
             "join time \(joinTime, format: .fixed(precision: 2), privacy: .public)s engine=\(name, privacy: .public) live=\(live, privacy: .public)"
         )
+        if live {
+            ChannelSwitchDiagnostics.noteFirstFrame()
+        }
         persist()
     }
 

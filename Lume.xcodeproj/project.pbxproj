@@ -218,6 +218,7 @@
 				C67C02BD2F880F2200842DBA /* Frameworks */,
 				C67C02BE2F880F2200842DBA /* Resources */,
 				C6AA10052FDD00010000AA05 /* Embed Frameworks */,
+				C66C81702FC5A59D0048468E /* Fix Embedded Framework CFBundleIdentifier (post-embed) */,
 				C6AA310C2FDD00020000AB0C /* Embed Foundation Extensions */,
 				C6FEED020000000000000002 /* Inject .env secrets */,
 			);
@@ -453,6 +454,25 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/Scripts/fix-ksplayer-frameworks.sh\"\n";
 		};
+		C66C81702FC5A59D0048468E /* Fix Embedded Framework CFBundleIdentifier (post-embed) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Fix Embedded Framework CFBundleIdentifier (post-embed)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/Scripts/fix-ksplayer-frameworks.sh\"\n";
+		};
 		C6FEED020000000000000002 /* Inject .env secrets */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -552,13 +572,14 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 24;
-				DEVELOPMENT_TEAM = 7Q4F885549;
+				DEVELOPMENT_TEAM = KV56HMQ7GM;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers and WebDAV shares running on it.";
@@ -582,7 +603,6 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.1.0;
-				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -614,13 +634,14 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 24;
-				DEVELOPMENT_TEAM = 7Q4F885549;
+				DEVELOPMENT_TEAM = KV56HMQ7GM;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers and WebDAV shares running on it.";
@@ -644,7 +665,6 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.1.0;
-				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -949,13 +969,14 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Lume/Lume-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 24;
-				DEVELOPMENT_TEAM = 7Q4F885549;
+				DEVELOPMENT_TEAM = KV56HMQ7GM;
 				ENABLE_APP_SANDBOX = YES;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers and WebDAV shares running on it.";
@@ -979,7 +1000,6 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.1.0;
-				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1323,6 +1343,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Lume/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Lume needs access to your local network to reach media servers and WebDAV shares running on it.";
@@ -1346,7 +1367,6 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 2.1.0;
-				INFOPLIST_KEY_CFBundleDisplayName = TeamPlay;
 				PRODUCT_BUNDLE_IDENTIFIER = time.teamplay.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

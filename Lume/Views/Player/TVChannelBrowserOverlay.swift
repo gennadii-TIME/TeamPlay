@@ -203,7 +203,7 @@
                         Spacer(minLength: 0)
                     }
                 }
-                .buttonStyle(TVBrowserRowStyle(isSelected: section.id == selectedSectionID))
+                    .buttonStyle(TVBlueFocusRowStyle(isSelected: section.id == selectedSectionID))
                 .focused($focus, equals: .section(section.id))
                 .id(FocusTarget.section(section.id))
             }
@@ -225,7 +225,7 @@
                     } label: {
                         channelLabel(channel, isCurrent: isCurrent)
                     }
-                    .buttonStyle(TVBrowserRowStyle(isSelected: isCurrent))
+                    .buttonStyle(TVBlueFocusRowStyle(isSelected: isCurrent))
                     .focused($focus, equals: .channel(channel.id))
                     .id(FocusTarget.channel(channel.id))
                 }
@@ -260,13 +260,15 @@
 
                 Spacer(minLength: 0)
 
-                // Flag channels with an archive so the viewer knows the guide
-                // column offers replays before they move into it.
-                if channel.tvArchive > 0 {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.blue)
-                        .accessibilityLabel("Catch-up available")
+                // Flag channels with a *buildable* archive so the guide never
+                // promises replay we cannot construct.
+                if PlayableMedia.canOfferCatchup(stream: channel) {
+                    Text("Archive")
+                        .font(.system(size: 14, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(TVTeamPlayFocus.archiveAmber.opacity(0.9), in: Capsule())
+                        .accessibilityLabel("Archive")
                 }
 
                 if isCurrent {
@@ -286,14 +288,14 @@
                     .padding(.vertical, 40)
             } else {
                 let now = Date()
-                let hasCatchup = (guideStream?.tvArchive ?? 0) > 0
+                let hasCatchup = guideStream.map { PlayableMedia.canOfferCatchup(stream: $0) } ?? false
                 ForEach(guideEntries) { entry in
                     Button {
                         selectGuide(entry)
                     } label: {
                         guideRowLabel(entry, now: now, hasCatchup: hasCatchup)
                     }
-                    .buttonStyle(TVBrowserRowStyle(isSelected: entry.isLive(at: now)))
+                    .buttonStyle(TVBlueFocusRowStyle(isSelected: entry.isLive(at: now)))
                     .focused($focus, equals: .guide(entry.id))
                     .id(FocusTarget.guide(entry.id))
                 }
@@ -461,7 +463,7 @@
                 guideEntries = []
                 return
             }
-            let archiveDays = stream.tvArchive > 0 ? max(1, stream.tvArchiveDuration) : 0
+            let archiveDays = stream.tvArchive > 0 ? max(0, stream.tvArchiveDuration) : 0
             let listings = TVPlayerContent.guideListings(
                 channelId: stream.epgChannelId, archiveDays: archiveDays, in: modelContext
             )
@@ -510,8 +512,9 @@
         }
 
         /// Act on a guide entry: a past programme starts catch-up playback (when
-        /// the channel has an archive), the live one plays the channel, and an
-        /// upcoming one isn't playable yet.
+        /// the channel has a buildable archive), the live one plays the channel,
+        /// and an upcoming one isn't playable yet. Past programmes never fall
+        /// back to live — that is what left viewers on a non-seekable stream.
         private func selectGuide(_ entry: GuideEntry) {
             guard let stream = guideStream,
                   let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext) else { return }
@@ -519,13 +522,26 @@
             if entry.isLive(at: now) {
                 select(channel: stream)
             } else if entry.isPast(at: now) {
-                guard let target = PlayableMedia.catchup(
-                    stream: stream,
-                    playlist: playlist,
-                    programTitle: entry.title,
-                    start: entry.start,
-                    end: entry.end
-                ) else { return }
+                guard PlayableMedia.isCatchupAvailable(stream: stream, start: entry.start, now: now),
+                      let target = PlayableMedia.catchup(
+                          stream: stream,
+                          playlist: playlist,
+                          programTitle: entry.title,
+                          start: entry.start,
+                          end: entry.end
+                      )
+                else {
+                    CatchupDiagnostics.logBuildResult(
+                        channelName: stream.name,
+                        mode: stream.catchupMode,
+                        hasSource: stream.catchupSource != nil,
+                        success: false,
+                        mediaKind: "live",
+                        reason: "past-not-started-as-live",
+                        safeURL: CatchupDiagnostics.safeURLDescription(stream.directURL)
+                    )
+                    return
+                }
                 onSelect(target)
             }
         }

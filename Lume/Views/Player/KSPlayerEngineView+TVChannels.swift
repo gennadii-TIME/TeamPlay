@@ -3,10 +3,11 @@
 //  Lume
 //
 //  In-player live channel switching for the KSPlayer host on tvOS: Siri-remote
-//  channel surfing (up/down/right with the controls hidden) and the two-column
-//  channel browser raised by a left press. Split out from the view file to keep
-//  it under the SwiftLint file-length threshold; the state these members drive
-//  is `internal` (not `private`) so this same-module extension can reach it.
+//  channel surfing (up/down with the controls hidden), the channel browser
+//  raised by ←, and the programme guide raised by →. Split out from the view
+//  file to keep it under the SwiftLint file-length threshold; the state these
+//  members drive is `internal` (not `private`) so this same-module extension
+//  can reach it.
 //
 
 #if os(tvOS)
@@ -30,8 +31,21 @@
             .transition(.move(edge: .leading).combined(with: .opacity))
         }
 
+        /// Per-channel programme guide (existing `TVChannelProgramGuideScreen`).
+        var programGuide: some View {
+            TVPlayerProgramGuideOverlay(
+                media: media,
+                onSelect: { target in
+                    onSelectMedia?(target)
+                    closeProgramGuide()
+                    showControls()
+                },
+                onClose: { closeProgramGuide() }
+            )
+        }
+
         func openChannelBrowser() {
-            guard media.isLive, !isChannelBrowserOpen else { return }
+            guard media.allowsLiveTVChrome, !isChannelBrowserOpen, !isProgramGuideOpen else { return }
             hideTask?.cancel()
             withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = true }
         }
@@ -42,11 +56,20 @@
             Task { @MainActor in catcherFocused = true }
         }
 
+        func openProgramGuide() {
+            guard media.allowsLiveTVChrome, !isProgramGuideOpen, !isChannelBrowserOpen else { return }
+            hideTask?.cancel()
+            withAnimation(.easeInOut(duration: 0.25)) { isProgramGuideOpen = true }
+        }
+
+        func closeProgramGuide() {
+            withAnimation(.easeInOut(duration: 0.25)) { isProgramGuideOpen = false }
+            Task { @MainActor in catcherFocused = true }
+        }
+
         /// Change the live channel from the Siri Remote — up/down surf the way
-        /// the viewer's `LiveSurfMode` maps the press, right recalls the channel
-        /// watched just before this one. The swap itself is
-        /// `PlayerMediaSwapper`'s, shared with the other three engines and with
-        /// the on-screen transport controls.
+        /// the viewer's `LiveSurfMode` maps the press. Right no longer recalls
+        /// here; it opens the programme guide (see `tapCatcher`).
         func switchLiveChannel(_ direction: MoveCommandDirection) {
             mediaSwapper.surf(
                 direction, from: media,
@@ -56,6 +79,43 @@
                 select: { onSelectMedia?($0) },
                 showControls: showControls
             )
+        }
+
+        /// Single entry for Apple Remote MoveCommand and UIPress/CEC twins.
+        func handleChannelSurfInput(
+            _ direction: MoveCommandDirection,
+            source: TVChannelSurfInputSource
+        ) {
+            let surfDirection: TVChannelSurfDirection
+            switch direction {
+            case .up: surfDirection = .up
+            case .down: surfDirection = .down
+            default: return
+            }
+            // Heal a stuck `.controls` phase after OSD already hid (missed
+            // noteControlsClosed) so surfing is not permanently blocked.
+            if !isControlsVisible, controlSession.phase == .controls {
+                controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+            }
+            let gate = TVChannelSurfGate(
+                isOSDVisible: isControlsVisible,
+                hasOpenPanel: isPanelOpen || isChannelBrowserOpen || isProgramGuideOpen,
+                isScrubbing: controlSession.isScrubbing || controlSession.isCommitInFlight,
+                allowsChannelSurf: controlSession.allowsChannelSurf(
+                    controlsVisible: isControlsVisible,
+                    mediaIsLive: media.isLive
+                )
+            )
+            let decision = surfRouter.evaluate(
+                direction: surfDirection,
+                source: source,
+                gate: gate,
+                phase: controlSession.phase.rawValue,
+                focusTarget: isControlsVisible ? "osd" : "catcher",
+                channelID: media.id
+            )
+            guard decision.accepted else { return }
+            switchLiveChannel(direction)
         }
     }
 

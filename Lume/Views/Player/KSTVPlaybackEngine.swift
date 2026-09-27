@@ -48,6 +48,12 @@
             if info != videoInfo { videoInfo = info }
         }
 
+        /// Chase a nil `videoInfo` from the ~10 Hz onPlay tick without
+        /// republishing when nothing changed.
+        func chaseVideoInfo(at _: TimeInterval) {
+            if videoInfo == nil { refreshVideoInfo() }
+        }
+
         /// Clear published state when the host swaps streams.
         func reset() {
             if isPlaying { isPlaying = false }
@@ -55,6 +61,15 @@
         }
 
         // MARK: - TVPlaybackEngine
+
+        var isMuted: Bool {
+            get { coordinator?.isMuted ?? false }
+            set {
+                guard let coordinator, coordinator.isMuted != newValue else { return }
+                coordinator.isMuted = newValue
+                objectWillChange.send()
+            }
+        }
 
         var audioTrackOptions: [PlayerTrackOption] {
             let tracks = coordinator?.playerLayer?.player.tracks(mediaType: .audio) ?? []

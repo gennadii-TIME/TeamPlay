@@ -170,31 +170,73 @@ nonisolated class M3UClient {
 
     private static let hashChunkSize = 1 << 20
 
+    /// Result of downloading (and optionally gunzipping) an XMLTV guide.
+    /// Durations are for diagnostics only — never pair them with the URL.
+    struct EPGFileFetch: Sendable {
+        let fileURL: URL
+        let downloadSeconds: TimeInterval
+        let decompressSeconds: TimeInterval
+        /// SHA-256 of the *downloaded* bytes (gzip payload when compressed), so
+        /// an unchanged remote guide can skip parse + SwiftData rewrite.
+        let contentDigest: String?
+    }
+
     /// Downloads an XMLTV guide to a temp file for streaming parse. Gzipped
     /// guides (`guide.xml.gz` — the common way public EPGs are hosted) are
     /// decompressed to a fresh temp file first.
     func downloadEPG(from urlString: String) async throws -> URL {
+        try await fetchEPG(from: urlString).fileURL
+    }
+
+    /// Same as `downloadEPG`, with phase timings and a content digest for skip-
+    /// if-unchanged.
+    func fetchEPG(from urlString: String) async throws -> EPGFileFetch {
         guard let url = URL(string: urlString) else { throw M3UError.invalidURL }
 
         if url.isFileURL {
             guard FileManager.default.fileExists(atPath: url.path) else {
                 throw M3UError.fileNotFound
             }
-            return try gunzipIfNeeded(url, deleteOriginal: false)
+            let digest = Self.sha256Hex(ofFileAt: url)
+            let decompressed = try gunzipIfNeeded(url, deleteOriginal: false)
+            return EPGFileFetch(
+                fileURL: decompressed.fileURL,
+                downloadSeconds: 0,
+                decompressSeconds: decompressed.seconds,
+                contentDigest: digest
+            )
         }
 
+        let downloadStarted = Date()
         let downloaded = try await download(url, suffix: ".xmltv")
-        return try gunzipIfNeeded(downloaded, deleteOriginal: true)
+        let downloadSeconds = Date().timeIntervalSince(downloadStarted)
+        let digest = Self.sha256Hex(ofFileAt: downloaded)
+        let decompressed = try gunzipIfNeeded(downloaded, deleteOriginal: true)
+        return EPGFileFetch(
+            fileURL: decompressed.fileURL,
+            downloadSeconds: downloadSeconds,
+            decompressSeconds: decompressed.seconds,
+            contentDigest: digest
+        )
     }
 
-    private func gunzipIfNeeded(_ fileURL: URL, deleteOriginal: Bool) throws -> URL {
-        guard GzipFile.isGzip(fileURL) else { return fileURL }
+    private struct GunzipResult {
+        let fileURL: URL
+        let seconds: TimeInterval
+    }
+
+    private func gunzipIfNeeded(_ fileURL: URL, deleteOriginal: Bool) throws -> GunzipResult {
+        guard GzipFile.isGzip(fileURL) else {
+            return GunzipResult(fileURL: fileURL, seconds: 0)
+        }
         Logger.network.info("EPG file is gzipped, decompressing")
+        let started = Date()
         let decompressed = try GzipFile.decompress(fileURL)
+        let seconds = Date().timeIntervalSince(started)
         if deleteOriginal {
             try? FileManager.default.removeItem(at: fileURL)
         }
-        return decompressed
+        return GunzipResult(fileURL: decompressed, seconds: seconds)
     }
 
     private func download(_ url: URL, suffix: String) async throws -> URL {

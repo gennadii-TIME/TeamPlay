@@ -248,7 +248,9 @@ struct FullScreenPlayerView: View {
         // own appearance, and an async baseline can land after them — which
         // would bake a fault the viewer just lived through into the "before"
         // snapshot and read the session as flawless.
-        .onAppear { beginReviewSession() }
+        .onAppear {
+            beginReviewSession()
+        }
         .task {
             // Seed the recall pair with the channel we opened on, so the very
             // first in-player recall has somewhere to jump back to.
@@ -508,6 +510,9 @@ struct FullScreenPlayerView: View {
     /// no `@Query` invalidation. Live streams carry no progress.
     private func bufferProgress() {
         guard !activeMedia.isLive else { return }
+        if activeMedia.isCatchup {
+            recordArchiveResume(force: false)
+        }
         WatchProgressBuffer.record(
             ref: activeMedia.contentRef,
             progress: clock.current,
@@ -520,20 +525,16 @@ struct FullScreenPlayerView: View {
     /// resulting store merge can't disturb playback. Captures the clock
     /// synchronously *before* awaiting, so a subsequent `clock.reset()` can't
     /// race the read; clears the buffer entry once the write lands.
-    func persistProgressDetached(force: Bool) {
+    func persistProgressDetached(force: Bool, shouldRecordArchiveResume: Bool = true) {
         guard let writer = progressWriter else { return }
         if activeMedia.isLive, !force { return }
+        if shouldRecordArchiveResume, activeMedia.isCatchup {
+            recordArchiveResume(force: true)
+        }
         let ref = activeMedia.contentRef
-        // An explicit "next episode" already settled this stream at its full
-        // duration. Recording the position it was skipped from would walk that
-        // back to unwatched, so the completion stands and this flush stands down.
         if ref == completedRef { return }
         let now = clock.current
         let total = clock.duration
-        // Held so `endReviewSession` can await it: `writer` is an actor, so the
-        // await below suspends, and without the handle the review policy would
-        // read `completedTitles` before this task increments it — the third
-        // finished title would then only arm the *next* session.
         let previous = pendingProgressWrite
         pendingProgressWrite = Task { @MainActor in
             await previous?.value
@@ -546,6 +547,24 @@ struct FullScreenPlayerView: View {
                 AppStoreReviewPrompt.shared.noteCompletedTitle()
             }
         }
+    }
+
+    /// Persist catch-up scrub position for the TeamPlay "Continue from…" prompt.
+    private func recordArchiveResume(force: Bool) {
+        guard activeMedia.isCatchup else { return }
+        let position = clock.current
+        guard force || position >= 5 else { return }
+        let streamID: String = {
+            if case let .live(id) = activeMedia.contentRef { return id }
+            return activeMedia.id
+        }()
+        TVArchiveResumeStore.record(
+            catchupID: activeMedia.id,
+            position: position,
+            programTitle: activeMedia.subtitle ?? activeMedia.title,
+            channelName: activeMedia.title,
+            streamID: streamID
+        )
     }
 
     /// One-time "watched" sync to every connected tracker. Runs at most once per

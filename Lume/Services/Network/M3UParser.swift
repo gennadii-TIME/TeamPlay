@@ -22,6 +22,13 @@ import Foundation
 nonisolated struct M3UHeader {
     /// XMLTV guide URL from `url-tvg` / `x-tvg-url`, when the playlist carries one.
     var epgURL: String?
+    /// Playlist-wide catch-up mode (`catchup` / `catchup-type` on `#EXTM3U`).
+    /// Applied to entries that omit their own catch-up attributes.
+    var catchup: String? = nil
+    /// Playlist-wide `catchup-source` template.
+    var catchupSource: String? = nil
+    /// Playlist-wide archive depth in days.
+    var catchupDays: Int? = nil
 }
 
 /// One playlist entry: an `#EXTINF` line plus the stream URL that follows it.
@@ -35,6 +42,12 @@ nonisolated struct M3UEntry {
     /// when present. Some providers serve live and on-demand through identical
     /// URLs and only this attribute distinguishes them.
     var type: String?
+    /// IPTV-extended catch-up mode (`shift`, `flussonic`, `default`, …).
+    var catchup: String? = nil
+    /// Template or query fragment from `catchup-source`.
+    var catchupSource: String? = nil
+    /// Archive depth in days from `catchup-days` (0 when absent).
+    var catchupDays: Int? = nil
 }
 
 // MARK: - Parser
@@ -208,6 +221,10 @@ nonisolated enum M3UParser {
         /// instead of, or in addition to, `group-title`).
         var pendingGroup: String?
         var headerDelivered = false
+        /// Catch-up defaults from `#EXTM3U` — inherited by entries that omit them.
+        var headerCatchup: String?
+        var headerCatchupSource: String?
+        var headerCatchupDays: Int?
 
         mutating func consume(line: String, onHeader: ((M3UHeader) -> Void)?) -> M3UEntry? {
             if line.hasPrefix("#") {
@@ -218,7 +235,11 @@ nonisolated enum M3UParser {
                         .trimmingCharacters(in: .whitespaces)
                 } else if line.hasPrefix("#EXTM3U"), !headerDelivered {
                     headerDelivered = true
-                    onHeader?(M3UParser.parseHeader(line))
+                    let header = M3UParser.parseHeader(line)
+                    headerCatchup = header.catchup
+                    headerCatchupSource = header.catchupSource
+                    headerCatchupDays = header.catchupDays
+                    onHeader?(header)
                 }
                 // Anything else (#EXTVLCOPT, #KODIPROP, comments…) is skipped.
                 return nil
@@ -234,7 +255,10 @@ nonisolated enum M3UParser {
                 // Plain (non-extended) m3u: a bare URL with no metadata.
                 guard looksLikeURL(line) else { return nil }
                 let fallbackName = URL(string: line)?.deletingPathExtension().lastPathComponent ?? line
-                return M3UEntry(name: fallbackName, url: line, tvgId: nil, logo: nil, group: pendingGroup, type: nil)
+                return M3UEntry(
+                    name: fallbackName, url: line, tvgId: nil, logo: nil, group: pendingGroup, type: nil,
+                    catchup: headerCatchup, catchupSource: headerCatchupSource, catchupDays: headerCatchupDays
+                )
             }
 
             let name = info.name.isEmpty ? (info.tvgName ?? line) : info.name
@@ -244,7 +268,10 @@ nonisolated enum M3UParser {
                 tvgId: info.tvgId,
                 logo: info.logo,
                 group: info.group ?? pendingGroup,
-                type: info.type
+                type: info.type,
+                catchup: info.catchup ?? headerCatchup,
+                catchupSource: info.catchupSource ?? headerCatchupSource,
+                catchupDays: info.catchupDays ?? headerCatchupDays
             )
         }
 
@@ -262,6 +289,9 @@ nonisolated enum M3UParser {
         var logo: String?
         var group: String?
         var type: String?
+        var catchup: String?
+        var catchupSource: String?
+        var catchupDays: Int?
     }
 
     /// Parses `#EXTINF:-1 tvg-id="..." tvg-logo="..." group-title="...",Name`.
@@ -285,19 +315,37 @@ nonisolated enum M3UParser {
                 .trimmingCharacters(in: .whitespaces)
         }
 
+        let daysRaw = nonEmpty(attributes["catchup-days"])
+            ?? nonEmpty(attributes["timeshift"])
+            ?? nonEmpty(attributes["tvg-rec"])
+        let catchupDays = daysRaw.flatMap(Int.init)
+        // `catchup-type` is the legacy IPTV Simple alias for `catchup`.
+        let catchup = nonEmpty(attributes["catchup"]) ?? nonEmpty(attributes["catchup-type"])
+
         return ExtInf(
             name: name,
             tvgId: nonEmpty(attributes["tvg-id"]),
             tvgName: nonEmpty(attributes["tvg-name"]),
             logo: nonEmpty(attributes["tvg-logo"]),
             group: nonEmpty(attributes["group-title"]),
-            type: nonEmpty(attributes["type"])
+            type: nonEmpty(attributes["type"]),
+            catchup: catchup,
+            catchupSource: nonEmpty(attributes["catchup-source"]),
+            catchupDays: catchupDays
         )
     }
 
     static func parseHeader(_ line: String) -> M3UHeader {
         let attributes = parseAttributes(line)
-        return M3UHeader(epgURL: nonEmpty(attributes["url-tvg"]) ?? nonEmpty(attributes["x-tvg-url"]))
+        let daysRaw = nonEmpty(attributes["catchup-days"])
+            ?? nonEmpty(attributes["timeshift"])
+            ?? nonEmpty(attributes["tvg-rec"])
+        return M3UHeader(
+            epgURL: nonEmpty(attributes["url-tvg"]) ?? nonEmpty(attributes["x-tvg-url"]),
+            catchup: nonEmpty(attributes["catchup"]) ?? nonEmpty(attributes["catchup-type"]),
+            catchupSource: nonEmpty(attributes["catchup-source"]),
+            catchupDays: daysRaw.flatMap(Int.init)
+        )
     }
 
     /// Extracts `key="value"` pairs (the only attribute form the IPTV dialect

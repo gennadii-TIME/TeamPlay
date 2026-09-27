@@ -47,6 +47,13 @@ final class PlayerMediaSwapper {
 
     private var lastSwapAt: Date?
 
+    #if os(tvOS)
+        /// Ring cursor so rapid ↑/↓ skip the bisect after the first locate.
+        private var surfCursor: LiveChannelNavigator.SurfCursor?
+        /// Latest channel chosen while presses are still landing; cleared after select.
+        private var pendingSurfTarget: PlayableMedia?
+    #endif
+
     /// Play the neighbour on `step`'s side, if there is one and the previous
     /// swap has settled. Reports whether the stream actually changed, so a
     /// caller can keep its controls up only when something happened.
@@ -99,10 +106,10 @@ final class PlayerMediaSwapper {
         /// "last" button). Falls back to summoning the controls when there's
         /// nothing to jump to.
         ///
-        /// The direction mapping is the remote's alone — the on-screen controls
-        /// take `step(_:in:)` with a literal previous/next, since a button
-        /// labelled "next" that ran backwards under `.listOrder` would be a bug,
-        /// not a preference.
+        /// Rapid ↑/↓ presses are not dropped. Each press resolves from the
+        /// latest pending target (last channel wins); the previous in-flight
+        /// decoder load is superseded when `activeMedia` changes. A ring cursor
+        /// keeps follow-up presses to a single-row fetch instead of a bisect.
         func surf(
             _ direction: MoveCommandDirection,
             from media: PlayableMedia,
@@ -111,26 +118,52 @@ final class PlayerMediaSwapper {
             showControls: () -> Void
         ) {
             guard media.isLive else { return }
-            let target: PlayableMedia?
+
             switch direction {
             case .up, .down:
                 let sort = ContentSortOption(rawValue: lookup.sortRaw) ?? .playlist
-                target = LiveChannelNavigator.adjacentMedia(
-                    for: media, surfing: direction == .up ? .up : .down,
-                    mode: .preferred,
-                    sort: sort, restriction: lookup.restriction, in: lookup.context
+                let mode = LiveSurfMode.preferred
+                let surfDirection: LiveChannelNavigator.SurfDirection = direction == .up ? .up : .down
+                let offset = surfDirection.listOffset(in: mode)
+                // If the host has caught up to the last select, drop the pending
+                // base; otherwise keep walking from it so rapid presses don't
+                // re-step the still-rendered previous channel.
+                if let pending = pendingSurfTarget, pending.id == media.id {
+                    pendingSurfTarget = nil
+                }
+                let base = pendingSurfTarget ?? media
+                let target = LiveChannelNavigator.step(
+                    from: base,
+                    offset: offset,
+                    sort: sort,
+                    restriction: lookup.restriction,
+                    cursor: &surfCursor,
+                    in: lookup.context
                 )
+                guard let target else { showControls(); return }
+
+                let gen = ChannelSwitchDiagnostics.beginPress(channelTitle: target.title)
+                ChannelSwitchDiagnostics.noteChannelSelected(generation: gen)
+                ChannelSwitchDiagnostics.noteURLReady(generation: gen)
+                pendingSurfTarget = target
+                // Selecting immediately updates title/logo and replaces any
+                // in-flight stream load for the previous press (last wins).
+                select(target)
+                showControls()
             case .right:
-                target = LiveChannelHistory.recallMedia(
+                let target = LiveChannelHistory.recallMedia(
                     in: lookup.context, scope: media.channelScope, restriction: lookup.restriction
                 )
+                guard let target else { showControls(); return }
+                surfCursor = nil
+                pendingSurfTarget = nil
+                guard accept() else { return }
+                select(target)
+                showControls()
+
             default:
                 return
             }
-            guard let target else { showControls(); return }
-            guard accept() else { return }
-            select(target)
-            showControls()
         }
     }
 

@@ -75,6 +75,11 @@ struct AVPlayerEngineView: View {
     @State private var isPanelOpen = false
     /// Bumped to ask the overlay to close its open panel (Menu/back press).
     @State private var panelCloseToken = 0
+    #if os(tvOS)
+        @StateObject private var controlSession = TVPlayerControlSession()
+        @StateObject private var timedMute = TimedMuteController()
+        @StateObject private var surfRouter = TVChannelSurfInputRouter()
+    #endif
     // Serialises stream changes for this session — the Siri remote's channel
     // surfing and the on-screen transport controls share it, so two swaps can
     // never be in flight at once. `internal` so the transport step in
@@ -83,6 +88,8 @@ struct AVPlayerEngineView: View {
         /// The full channel browser (categories + channels) raised by a left
         /// press while watching live TV with the controls hidden.
         @State private var isChannelBrowserOpen = false
+        /// Programme guide for the current channel, raised by → with OSD closed.
+        @State private var isProgramGuideOpen = false
         /// Drives focus onto the transparent tap-catcher once the controls
         /// auto-hide, so the Siri remote can summon them again.
         @FocusState private var catcherFocused: Bool
@@ -103,7 +110,7 @@ struct AVPlayerEngineView: View {
         @Environment(\.dismissWindow) private var dismissWindow
     #endif
 
-    private let autoHideInterval: TimeInterval = 4
+    private var autoHideInterval: TimeInterval { PlayerSettings.OSD.hideDelayInterval }
     /// How long to wait for playback before declaring a stream dead when this is
     /// the last engine in the priority list.
     private let startupTimeout: TimeInterval = 40
@@ -151,6 +158,9 @@ struct AVPlayerEngineView: View {
                 if isChannelBrowserOpen {
                     channelBrowser
                 }
+                if isProgramGuideOpen {
+                    programGuide
+                }
             #endif
 
             if loadFailed {
@@ -165,10 +175,14 @@ struct AVPlayerEngineView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             coordinator.onTime = { current in
-                if !isSeeking, current.isFinite { clock.current = current }
+                Task { @MainActor in
+                    if !isSeeking, current.isFinite { clock.current = current }
+                }
             }
             coordinator.onDuration = { total in
-                if total.isFinite, total > 0 { clock.duration = total }
+                Task { @MainActor in
+                    if total.isFinite, total > 0 { clock.duration = total }
+                }
             }
             coordinator.onPlaybackFailure = { reportFailure() }
             coordinator.startupTimeout = usesQuickStartupTimeout ? fallbackStartupTimeout : startupTimeout
@@ -187,12 +201,29 @@ struct AVPlayerEngineView: View {
                 advance: onRemoteAdvance
             ), owner: coordinator)
             scheduleHide()
+            #if os(tvOS)
+                TVChannelSurfPressRelay.shared.onArrowPress = { direction, source in
+                    if isChannelBrowserOpen || isProgramGuideOpen || isPanelOpen {
+                        return
+                    }
+                    if isControlsVisible {
+                        TVCompactOSDNavRelay.shared.handleArrow(direction)
+                    } else {
+                        handleChannelSurfInput(direction, source: source)
+                    }
+                }
+            #endif
         }
         .onDisappear {
             hideTask?.cancel()
             hoverHideTask?.cancel()
             NowPlayingService.shared.detachTransport(owner: coordinator)
             coordinator.tearDown()
+            #if os(tvOS)
+                TVChannelSurfPressRelay.shared.onArrowPress = nil
+                TVCompactOSDNavRelay.shared.onArrow = nil
+                surfRouter.reset()
+            #endif
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
             resetHideTimer()
@@ -209,6 +240,13 @@ struct AVPlayerEngineView: View {
             seekPosition = 0
             isPanelOpen = false
             loadFailed = false
+            #if os(tvOS)
+                controlSession.resetForNewStream(mediaIsCatchup: newMedia.isCatchup)
+                if isControlsVisible {
+                    controlSession.noteControlsOpened(mediaIsCatchup: newMedia.isCatchup)
+                }
+                timedMute.reassert { coordinator.isMuted = $0 }
+            #endif
             coordinator.reload(media: newMedia)
             resetHideTimer()
         }
@@ -258,15 +296,17 @@ struct AVPlayerEngineView: View {
             }
             .buttonStyle(AVInvisibleButtonStyle())
             // Yield focus to the failure overlay's buttons when a stream dies.
-            .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
+            .disabled(isControlsVisible || isChannelBrowserOpen || isProgramGuideOpen || loadFailed)
             .focused($catcherFocused)
             .tvRemoteMoveCommand { direction in
-                // Left opens the channel browser; up/down surf adjacent
-                // channels; right recalls the last channel watched.
-                if media.isLive, direction == .left {
+                // Only while controls are hidden (catcher disabled when OSD is up).
+                // TVTeam: ← channels, → EPG, ↑/↓ surf.
+                if media.allowsLiveTVChrome, direction == .left {
                     openChannelBrowser()
-                } else if media.isLive, direction == .up || direction == .down || direction == .right {
-                    switchLiveChannel(direction)
+                } else if media.allowsLiveTVChrome, direction == .right {
+                    openProgramGuide()
+                } else if media.isLive, direction == .up || direction == .down {
+                    handleChannelSurfInput(direction, source: .moveCommand)
                 } else {
                     showControls()
                 }
@@ -292,8 +332,11 @@ struct AVPlayerEngineView: View {
                 onResetHideTimer: { resetHideTimer() },
                 onSelectMedia: { onSelectMedia?($0) },
                 onPanelOpenChange: { setPanelOpen($0) },
-                onSwitchChannel: { switchLiveChannel($0) },
-                mediaSwapper: mediaSwapper, onCompleteCurrentItem: { onCompleteCurrentItem?() }
+                controlSession: controlSession,
+                        timedMute: timedMute,
+                mediaSwapper: mediaSwapper, onCompleteCurrentItem: { onCompleteCurrentItem?() },
+                onChannelSurf: { handleChannelSurfInput($0, source: .moveCommand) },
+                onHideControls: { hideControls() }
             )
         #else
             AVPlayerControlsOverlay(
@@ -337,6 +380,42 @@ struct AVPlayerEngineView: View {
             )
         }
 
+        private func handleChannelSurfInput(
+            _ direction: MoveCommandDirection,
+            source: TVChannelSurfInputSource
+        ) {
+            let surfDirection: TVChannelSurfDirection
+            switch direction {
+            case .up: surfDirection = .up
+            case .down: surfDirection = .down
+            default: return
+            }
+            // Heal a stuck `.controls` phase after OSD already hid (missed
+            // noteControlsClosed) so surfing is not permanently blocked.
+            if !isControlsVisible, controlSession.phase == .controls {
+                controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+            }
+            let gate = TVChannelSurfGate(
+                isOSDVisible: isControlsVisible,
+                hasOpenPanel: isPanelOpen || isChannelBrowserOpen || isProgramGuideOpen,
+                isScrubbing: controlSession.isScrubbing || controlSession.isCommitInFlight,
+                allowsChannelSurf: controlSession.allowsChannelSurf(
+                    controlsVisible: isControlsVisible,
+                    mediaIsLive: media.isLive
+                )
+            )
+            let decision = surfRouter.evaluate(
+                direction: surfDirection,
+                source: source,
+                gate: gate,
+                phase: controlSession.phase.rawValue,
+                focusTarget: isControlsVisible ? "osd" : "catcher",
+                channelID: media.id
+            )
+            guard decision.accepted else { return }
+            switchLiveChannel(direction)
+        }
+
         /// The two-column category / channel browser, slid in over the leading
         /// edge. Picking a channel switches the stream and surfaces the controls
         /// briefly so the new channel's name and EPG act as a banner.
@@ -353,8 +432,20 @@ struct AVPlayerEngineView: View {
             .transition(.move(edge: .leading).combined(with: .opacity))
         }
 
+        private var programGuide: some View {
+            TVPlayerProgramGuideOverlay(
+                media: media,
+                onSelect: { target in
+                    onSelectMedia?(target)
+                    closeProgramGuide()
+                    showControls()
+                },
+                onClose: { closeProgramGuide() }
+            )
+        }
+
         private func openChannelBrowser() {
-            guard media.isLive, !isChannelBrowserOpen else { return }
+            guard media.allowsLiveTVChrome, !isChannelBrowserOpen, !isProgramGuideOpen else { return }
             hideTask?.cancel()
             withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = true }
         }
@@ -362,6 +453,17 @@ struct AVPlayerEngineView: View {
         private func closeChannelBrowser() {
             withAnimation(.easeInOut(duration: 0.25)) { isChannelBrowserOpen = false }
             // Hand focus back to the tap-catcher so the remote keeps working.
+            Task { @MainActor in catcherFocused = true }
+        }
+
+        private func openProgramGuide() {
+            guard media.allowsLiveTVChrome, !isProgramGuideOpen, !isChannelBrowserOpen else { return }
+            hideTask?.cancel()
+            withAnimation(.easeInOut(duration: 0.25)) { isProgramGuideOpen = true }
+        }
+
+        private func closeProgramGuide() {
+            withAnimation(.easeInOut(duration: 0.25)) { isProgramGuideOpen = false }
             Task { @MainActor in catcherFocused = true }
         }
     #endif
@@ -374,6 +476,9 @@ struct AVPlayerEngineView: View {
     private func showControls() {
         guard !isControlsVisible else { resetHideTimer(); return }
         withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
+        #if os(tvOS)
+            controlSession.noteControlsOpened(mediaIsCatchup: media.isCatchup)
+        #endif
         scheduleHide()
     }
 
@@ -382,6 +487,9 @@ struct AVPlayerEngineView: View {
     private func hideControls() {
         hideTask?.cancel()
         withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+        #if os(tvOS)
+            controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+        #endif
     }
 
     /// Menu/back routing: close the channel browser or an open panel first,
@@ -393,18 +501,42 @@ struct AVPlayerEngineView: View {
             return
         }
         #if os(tvOS)
+            if isProgramGuideOpen {
+                closeProgramGuide()
+                return
+            }
             if isChannelBrowserOpen {
                 closeChannelBrowser()
                 return
             }
         #endif
-        if isPanelOpen {
-            panelCloseToken += 1
-        } else if isControlsVisible {
-            hideControls()
-        } else {
-            closePlayer()
-        }
+        #if os(tvOS)
+            if controlSession.capturesMenu || isPanelOpen {
+                panelCloseToken += 1
+            } else if media.isCatchup {
+                // Archive: Menu returns to live first (OSD open or closed);
+                // a second Menu on live then exits.
+                if !isControlsVisible {
+                    isControlsVisible = true
+                    controlSession.noteControlsOpened(mediaIsCatchup: true)
+                    Task { @MainActor in panelCloseToken += 1 }
+                } else {
+                    panelCloseToken += 1
+                }
+            } else if isControlsVisible {
+                hideControls()
+            } else {
+                closePlayer()
+            }
+        #else
+            if isPanelOpen {
+                panelCloseToken += 1
+            } else if isControlsVisible {
+                hideControls()
+            } else {
+                closePlayer()
+            }
+        #endif
     }
 
     private func resetHideTimer() {
@@ -429,6 +561,9 @@ struct AVPlayerEngineView: View {
             try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
             guard !Task.isCancelled, coordinator.isPlaying else { return }
             withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+            #if os(tvOS)
+                controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+            #endif
         }
     }
 

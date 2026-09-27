@@ -217,51 +217,16 @@ struct MainTabView: View {
             .animation(.easeInOut(duration: 0.2), value: router.isQuickSwitchPresented)
         }
 
-        private func tabView(selection: Binding<AppTab>) -> some View {
-            TabView(selection: selection) {
-                Tab(value: AppTab.search) {
-                    activeOnly(.search, selection: selection.wrappedValue) { SearchView() }
-                } label: {
-                    Image(systemName: "magnifyingglass")
+        private func tabView(selection _: Binding<AppTab>) -> some View {
+            TVTeamPlayShell { playlist in
+                // Manual "Update Channel List" — same blocking cover path as
+                // auto-sync, without requiring the playlist to be "due".
+                if activeSyncPlaylist == nil {
+                    activeSyncPlaylist = playlist
+                } else if !syncQueue.contains(where: { $0.id == playlist.id }) {
+                    syncQueue.append(playlist)
                 }
-
-                Tab(value: AppTab.home) {
-                    activeOnly(.home, selection: selection.wrappedValue) { HomeView() }
-                } label: {
-                    Text("Home")
-                }
-
-                Tab(value: AppTab.movies) {
-                    activeOnly(.movies, selection: selection.wrappedValue) { MoviesView() }
-                } label: {
-                    Text("Movies")
-                }
-
-                Tab(value: AppTab.series) {
-                    activeOnly(.series, selection: selection.wrappedValue) { SeriesView() }
-                } label: {
-                    Text("Series")
-                }
-
-                Tab(value: AppTab.liveTV) {
-                    activeOnly(.liveTV, selection: selection.wrappedValue) { LiveTVView() }
-                } label: {
-                    Text("Live TV")
-                }
-
-                if sportsTabEnabled {
-                    Tab(value: AppTab.sports) {
-                        activeOnly(.sports, selection: selection.wrappedValue) { TVSportsHubScreen() }
-                    } label: {
-                        Text("Sports")
-                    }
-                }
-
-                Tab(value: AppTab.settings) {
-                    activeOnly(.settings, selection: selection.wrappedValue) { SettingsView() }
-                } label: {
-                    Image(systemName: "gear")
-                }
+                autoSyncAttempted.insert(playlist.id)
             }
         }
 
@@ -286,23 +251,6 @@ struct MainTabView: View {
             }
             guard !blockingOverlayOwnsScreen else { return false }
             return !playlists.isEmpty || profileManager?.isReady == true
-        }
-
-        /// tvOS `TabView` keeps every *visited* tab's view hierarchy alive, and
-        /// each remote press triggers a focus/accessibility responder walk over
-        /// the whole window — a device trace showed those walks dominating the
-        /// EPG guide's scroll time once Home (hero + card rails) had been
-        /// visited. Rendering only the selected tab keeps the walked hierarchy
-        /// small; tab-local view state resets on switch, which is the usual
-        /// tvOS behaviour anyway (navigation paths live in `DeepLinkRouter`
-        /// and survive).
-        @ViewBuilder
-        private func activeOnly(_ tab: AppTab, selection: AppTab, @ViewBuilder content: () -> some View) -> some View {
-            if selection == tab {
-                content()
-            } else {
-                Color.clear
-            }
         }
     #else
         private func tabView(selection: Binding<AppTab>) -> some View {

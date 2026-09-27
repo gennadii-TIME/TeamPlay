@@ -52,18 +52,21 @@ extension FullScreenPlayerView {
     /// reaching into their state directly instead re-prepares a running session
     /// (a use-after-free in KSPlayer's decode threads).
     func switchMedia(to newMedia: PlayableMedia) {
-        guard newMedia.id != activeMedia.id else { return }
-        // Flush the outgoing stream's progress before the clock resets — capture
-        // happens synchronously inside `persistProgressDetached`.
-        persistProgressDetached(force: true)
-        // The completion claim covers exactly that one flush. Left standing, a
-        // step back onto the same episode would never record progress again.
+        // Replace whenever the playback source actually changes (URL / archive
+        // bounds) — `id` alone can collide across different timeshift windows.
+        guard newMedia.playbackSourceFingerprint != activeMedia.playbackSourceFingerprint else { return }
+        // Catchup → live of the same channel must not re-record archive resume
+        // after Go Live already cleared the store.
+        let skipArchiveResume = activeMedia.isCatchup && newMedia.isLive
+            && activeMedia.contentRef == newMedia.contentRef
+        persistProgressDetached(force: true, shouldRecordArchiveResume: !skipArchiveResume)
         completedRef = nil
         clock.reset()
-        // Restart the fallback chain from the primary engine for the new stream.
-        engineAttempt = 0
+        if !newMedia.isLive || !activeMedia.isLive {
+            engineAttempt = 0
+        }
         activeMedia = newMedia
-        // Slide the outgoing channel into the recall slot so `right` can jump back.
+        ChannelSwitchDiagnostics.notePlayerItemReady(generation: ChannelSwitchDiagnostics.generation)
         LiveChannelHistory.record(newMedia)
     }
 

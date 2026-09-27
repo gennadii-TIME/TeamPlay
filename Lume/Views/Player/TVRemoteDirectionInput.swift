@@ -123,6 +123,9 @@
             for press in presses {
                 guard let direction = Self.direction(for: press.type) else { continue }
                 TVRemoteDirectionInput.shared.handlePress(direction)
+                // HDMI-CEC / twin UIPress path for clean-screen channel surf.
+                let source: TVChannelSurfInputSource = Self.looksLikeCEC(press) ? .cec : .uiPress
+                TVChannelSurfPressRelay.shared.handleArrowPress(direction, source: source)
             }
             state = .failed
         }
@@ -135,6 +138,15 @@
             case .rightArrow: .right
             default: nil
             }
+        }
+
+        /// CEC remotes typically synthesise arrow presses without a matching
+        /// touch-surface swipe context. Apple Siri Remote clicks also produce
+        /// presses — the surf router dedupes against MoveCommand either way.
+        private static func looksLikeCEC(_ press: UIPress) -> Bool {
+            // Force is ~0 for many CEC synthesised presses; Siri clicks often
+            // report a positive force. Treat near-zero as CEC-ish for tracing.
+            press.force < 0.01
         }
     }
 

@@ -77,6 +77,10 @@ final class EPGSyncService {
     static let shared = EPGSyncService()
 
     private(set) var isSyncing = false
+    /// Coarse phase for the TV progress row (download → process → save).
+    private(set) var phase: EPGSyncPhase = .idle
+    /// 0...1 progress within the current refresh; indeterminate UI may ignore it.
+    private(set) var progress: Double = 0
 
     private var container: ModelContainer?
     private var task: Task<Void, Never>?
@@ -97,7 +101,8 @@ final class EPGSyncService {
     }
 
     /// Manual trigger (settings "Sync Now"): refreshes now regardless of the
-    /// schedule or any in-flight content sync.
+    /// schedule or any in-flight content sync. A second press while syncing is
+    /// a no-op — never starts a parallel refresh.
     func syncNow() {
         kick()
     }
@@ -196,22 +201,32 @@ final class EPGSyncService {
     private func kick(background: Bool = false) {
         guard let container, task == nil else { return }
         isSyncing = true
+        phase = .downloading
+        progress = 0.05
         isBackgroundRefresh = background
-        let manager = EPGSyncManager(modelContainer: container)
+        let manager = EPGSyncManager(modelContainer: container) { phase, fraction in
+            Task { @MainActor in
+                EPGSyncService.shared.phase = phase
+                EPGSyncService.shared.progress = fraction
+            }
+        }
         // Background guide refresh: run below the UI so an in-flight sync (which
         // saves into the shared catalog container, churning browse `@Query`s)
         // yields CPU to the main thread instead of competing with it. The
         // profile showed EPG ingest pegging a background thread at 100% in
         // lockstep with a frozen main thread right after a playlist sync.
         task = Task(priority: .utility) {
-            let succeeded = await manager.syncAllSources()
-            if succeeded {
+            let outcome = await manager.syncAllSources()
+            if outcome.succeeded {
                 EPGSyncSchedule.lastSyncDate = Date()
                 EPGSyncSchedule.schemaVersion = SyncFrequency.epgCurrentSchemaVersion
             }
+            EPGSyncDiagnostics.logTimings(outcome.timings)
             isSyncing = false
+            phase = .idle
+            progress = outcome.succeeded ? 1 : 0
             task = nil
-            Logger.database.info("EPG refresh finished (success: \(succeeded))")
+            Logger.database.info("EPG refresh finished (success: \(outcome.succeeded))")
             // A refresh cancelled for a content sync may wind down after that
             // sync already finished and found this task still set.
             runOwedRefresh()

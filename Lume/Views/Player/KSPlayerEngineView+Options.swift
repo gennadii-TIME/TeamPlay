@@ -127,7 +127,17 @@ enum KSPlayerOptionsFactory {
         options.canStartPictureInPictureAutomaticallyFromInline = allowsPictureInPicture && settings.autoPip
         options.autoSelectEmbedSubtitle = settings.autoSelectSubtitle
         options.maxBufferDuration = Double(settings.maxBuffer)
-        options.preferredForwardBufferDuration = Double(media.isLive ? settings.liveBuffer : settings.vodBuffer)
+        let forward = PlayerSettings.PlaybackBufferPreference.forwardBufferSeconds(
+            isLive: media.isLive,
+            automaticLive: Double(settings.liveBuffer),
+            automaticVOD: Double(settings.vodBuffer)
+        )
+        options.preferredForwardBufferDuration = forward
+        // Keep the ceiling at least as large as the forward target so a manual
+        // buffer preference cannot be clamped by an older maxBuffer setting.
+        if forward > options.maxBufferDuration {
+            options.maxBufferDuration = forward
+        }
         // Conditional: `appendHeader` writes both FFmpeg's `headers` format
         // option and `AVURLAssetHTTPHeaderFieldsKey`, so calling it
         // unconditionally would change the open path for every IPTV stream.

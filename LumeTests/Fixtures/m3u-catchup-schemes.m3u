@@ -1,0 +1,38 @@
+#EXTM3U
+# Supported m3u catch-up scheme fixtures for unit tests. Hosts are placeholders.
+
+# shift: append ?utc=&lutc=
+#EXTINF:-1 tvg-id="shift.1" catchup="shift" catchup-days="7",Shift Channel
+http://example.com/live/shift.ts
+
+# default without source → same as shift
+#EXTINF:-1 tvg-id="default.1" catchup="default" catchup-days="3",Default Shift Channel
+http://example.com/live/default.ts
+
+# default + catchup-source template (append behaviour)
+#EXTINF:-1 tvg-id="default.src" catchup="default" catchup-days="5" catchup-source="?utc=${start}&lutc=${end}",Default Source Channel
+http://example.com/live/default-src.ts
+
+# append with absolute template
+#EXTINF:-1 tvg-id="append.1" catchup="append" catchup-days="7" catchup-source="http://example.com/archive/ch1?from={utc}&to={lutc}",Append Absolute Channel
+http://example.com/live/append.ts
+
+# flussonic HLS
+#EXTINF:-1 tvg-id="fs.1" catchup="flussonic" catchup-days="4",Flussonic Channel
+http://example.com/ch/index.m3u8
+
+# flussonic-ts
+#EXTINF:-1 tvg-id="fsts.1" catchup="flussonic-ts" catchup-days="2",Flussonic TS Channel
+http://example.com/ch/index.m3u8
+
+# xtream live export path
+#EXTINF:-1 tvg-id="xc.1" catchup="xtream" catchup-days="7",Xtream Export Channel
+http://cdn.example.com:8080/live/user/pass/4242.ts
+
+# unknown scheme — must NOT advertise archive
+#EXTINF:-1 tvg-id="unknown.1" catchup="acme-private" catchup-days="7" catchup-source="http://example.com/x",Unknown Scheme Channel
+http://example.com/live/unknown.ts
+
+# append without source — must NOT advertise archive
+#EXTINF:-1 tvg-id="append.bad" catchup="append" catchup-days="7",Append Incomplete Channel
+http://example.com/live/append-bad.ts

@@ -27,7 +27,16 @@ extension SettingsView {
                 }
                 if let url = SupportInfo.emailURL {
                     Link(destination: url) {
-                        Label("Email", systemImage: "envelope")
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Email")
+                                Text(verbatim: SupportInfo.email)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "envelope")
+                        }
                     }
                 }
             } header: {

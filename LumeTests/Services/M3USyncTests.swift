@@ -329,7 +329,7 @@ struct M3USyncTests {
         #expect(try setupContext.fetchCount(FetchDescriptor<EPGListing>()) == 0)
 
         // The dedicated EPG sync imports the guide, filtered to known channels.
-        let didSync = await EPGSyncManager(modelContainer: container).syncAllSources()
+        let didSync = await EPGSyncManager(modelContainer: container).syncAllSources().succeeded
         #expect(didSync)
 
         let context = ModelContext(container)

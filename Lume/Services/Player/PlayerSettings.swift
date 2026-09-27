@@ -199,7 +199,116 @@ enum PlayerSettings {
         UserDefaults.standard.bool(tvRemoteSwipesKey, default: tvRemoteSwipesDefault)
     }
 
+    // MARK: - OSD chrome (tvOS)
+
+    /// How long the live / player OSD stays up without input before it hides.
+    enum OSD {
+        static let hideDelaySecondsKey = "player.osdHideDelaySeconds"
+        static let hideDelaySecondsDefault = 5
+        static let hideDelaySecondsOptions = [5, 6, 7, 8, 9, 10]
+
+        static func clamped(_ raw: Int) -> Int {
+            hideDelaySecondsOptions.contains(raw) ? raw : hideDelaySecondsDefault
+        }
+
+        /// Seconds until the whole OSD (main panel + hints) hides together.
+        static var hideDelaySeconds: Int {
+            clamped(UserDefaults.standard.integer(forKey: hideDelaySecondsKey))
+        }
+
+        static var hideDelayInterval: TimeInterval {
+            TimeInterval(hideDelaySeconds)
+        }
+    }
+
     // MARK: - Playback behaviour
+
+    /// Unified forward-buffer preference for every engine. Stored on-device in
+    /// `UserDefaults` (not CloudKit). `automatic` keeps each engine's own
+    /// default / advanced buffer options; a fixed value overrides the
+    /// forward buffer on the next stream start only — never resolution, bitrate,
+    /// or a disk video cache.
+    nonisolated enum PlaybackBufferPreference: String, CaseIterable, Identifiable {
+        case automatic
+        case oneSecond
+        case threeSeconds
+        case fiveSeconds
+        case tenSeconds
+
+        var id: String { rawValue }
+
+        static let storageKey = "player.playbackBuffer"
+        static let `default` = PlaybackBufferPreference.automatic
+
+        /// Fixed forward-buffer length in seconds, or `nil` for Automatic.
+        var seconds: TimeInterval? {
+            switch self {
+            case .automatic: nil
+            case .oneSecond: 1
+            case .threeSeconds: 3
+            case .fiveSeconds: 5
+            case .tenSeconds: 10
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .automatic: String(localized: "Automatic")
+            case .oneSecond: String(localized: "1 Second")
+            case .threeSeconds: String(localized: "3 Seconds")
+            case .fiveSeconds: String(localized: "5 Seconds")
+            case .tenSeconds: String(localized: "10 Seconds")
+            }
+        }
+
+        static func resolve(
+            raw: String? = UserDefaults.standard.string(forKey: storageKey)
+        ) -> PlaybackBufferPreference {
+            PlaybackBufferPreference(rawValue: raw ?? "") ?? .default
+        }
+
+        /// Forward buffer in seconds for the next load. When Automatic, returns
+        /// the engine's own live/VOD defaults so existing behaviour is unchanged.
+        static func forwardBufferSeconds(
+            isLive: Bool,
+            automaticLive: TimeInterval,
+            automaticVOD: TimeInterval,
+            defaults: UserDefaults = .standard
+        ) -> TimeInterval {
+            if let seconds = resolve(raw: defaults.string(forKey: storageKey)).seconds {
+                return seconds
+            }
+            return isLive ? automaticLive : automaticVOD
+        }
+
+        /// VLC `network-caching` / `live-caching` / `file-caching` are in
+        /// milliseconds. Automatic keeps the per-engine advanced values.
+        static func vlcCachingMilliseconds(
+            isLive: Bool,
+            automaticLiveMs: Int,
+            automaticVODMs: Int,
+            defaults: UserDefaults = .standard
+        ) -> Int {
+            if let seconds = resolve(raw: defaults.string(forKey: storageKey)).seconds {
+                return Int((seconds * 1000).rounded())
+            }
+            return isLive ? automaticLiveMs : automaticVODMs
+        }
+
+        /// LumeEngine `bufferTarget` is seconds; its advanced options store ms.
+        static func lumeBufferTargetSeconds(
+            isLive: Bool,
+            automaticLiveMs: Int,
+            automaticVODMs: Int,
+            defaults: UserDefaults = .standard
+        ) -> TimeInterval {
+            if let seconds = resolve(raw: defaults.string(forKey: storageKey)).seconds {
+                return seconds
+            }
+            let ms = isLive ? automaticLiveMs : automaticVODMs
+            return Double(ms) / 1000
+        }
+    }
 
     /// Engine-independent playback preferences for episodic content. Both default
     /// on, matching the behaviour viewers expect from a binge-friendly player.

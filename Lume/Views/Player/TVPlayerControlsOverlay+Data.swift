@@ -11,6 +11,7 @@
 #if os(tvOS)
 
     import Foundation
+    import OSLog
     import SwiftData
     import SwiftUI
 
@@ -20,10 +21,15 @@
         }
 
         func resolveContent() {
-            // A stream swap invalidates any in-flight scrub.
-            isScrubbing = false
-            scrubResetTask?.cancel()
-            scrubResetTask = nil
+            // OSD is visible here. Cancel leftover scrub; keep `.controls` after a
+            // seek settle so focus / hide-timer do not jump. Never wipe a settled
+            // seek back to bare `.timeshift` while the overlay is still up.
+            if controlSession.isScrubbing {
+                _ = controlSession.cancelScrub()
+            }
+            if controlSession.phase == .live || controlSession.phase == .timeshift {
+                controlSession.noteControlsOpened(mediaIsCatchup: media.isCatchup)
+            }
             episode = nil
             seasonEpisodes = []
             episodeNav = .none
@@ -31,9 +37,11 @@
             liveStream = nil
             epgNow = nil
             epgNext = nil
+            channelEPGGuide = []
             seriesPlaylist = nil
             recentChannels = []
             recentNowTitles = [:]
+            channelCategoryName = nil
 
             switch media.contentRef {
             case .episode:
@@ -47,12 +55,41 @@
             case .live:
                 guard let stream = TVPlayerContent.liveStream(for: media.contentRef, in: modelContext) else { return }
                 liveStream = stream
-                let listings = TVPlayerContent.epgListings(channelId: stream.epgChannelId, in: modelContext)
+                // Preload a local guide slice for scrub-preview programme lookup
+                // (and now/next). Never refetch on ←/→ nudges.
                 let now = Date()
-                epgNow = listings.first { $0.start <= now && now < $0.end }
-                epgNext = listings.first { $0.start > now }
-                recentChannels = TVPlayerContent.recentChannels(in: modelContext, restriction: restriction)
-                recentNowTitles = TVPlayerContent.nowProgrammeTitles(for: recentChannels, in: modelContext)
+                let earliest = LiveTimeshift.archiveEarliest(stream: stream, now: now)
+                    ?? media.archiveWindowStart
+                    ?? now.addingTimeInterval(-3_600)
+                let horizonEnd = max(
+                    media.archiveWindowEnd ?? now,
+                    now.addingTimeInterval(12 * 3_600)
+                )
+                let listings = TVPlayerContent.epgListings(
+                    channelId: stream.epgChannelId,
+                    coveringFrom: earliest,
+                    to: horizonEnd,
+                    in: modelContext
+                )
+                channelEPGGuide = listings.map(OSDProgramInfo.init)
+                let playhead = media.isCatchup
+                    ? LiveTimeshift.absolutePlaybackDate(media: media, playerTime: clock.current)
+                    : now
+                epgNow = listings.first { $0.start <= playhead && playhead < $0.end }
+                epgNext = listings.first { $0.start > playhead }
+                recentChannels = []
+                recentNowTitles = [:]
+                if let catId = stream.categoryId, !catId.isEmpty {
+                    let typeLive = CategoryType.live.rawValue
+                    var descriptor = FetchDescriptor<Category>(
+                        predicate: #Predicate { $0.apiId == catId && $0.typeRaw == typeLive }
+                    )
+                    descriptor.fetchLimit = 8
+                    let matches = (try? modelContext.fetch(descriptor)) ?? []
+                    channelCategoryName = matches.first {
+                        stream.id.hasPrefix(String($0.id.prefix(36)))
+                    }?.name ?? matches.first?.name
+                }
             }
         }
 
@@ -102,79 +139,593 @@
             infoSnapshot.techCaption
         }
 
-        // MARK: Scrubbing (VOD)
+        // MARK: Scrubbing (VOD + live timeshift)
 
-        /// Select toggles scrub mode: the first press enters (and pauses), the
-        /// second commits the seek.
-        func toggleScrub() {
-            if isScrubbing { commitScrub() } else { beginScrub() }
+        /// Live channels with a buildable archive (`tvg-rec` > 0) expose the
+        /// same scrubber as VOD, mapped onto a wall-clock window rather than
+        /// HLS `seekableTimeRanges`.
+        var canSeekMedia: Bool {
+            if media.isCatchup { return true }
+            if media.isLive { return liveTimeshiftWindow != nil }
+            return true
         }
 
-        /// Enter scrub mode: remember the play state, pause, and seed the
-        /// target at the current position. Treated like an open panel so the
-        /// controls stay up and the Menu button routes back here to cancel.
-        func beginScrub() {
-            guard !media.isLive else { return }
-            wasPlayingBeforeScrub = coordinator.isPlaying
-            if coordinator.isPlaying { onTogglePlay() }
-            scrubTarget = clock.current.isFinite ? clock.current : 0
-            scrubStepLevel = 0
-            scrubLastDirection = nil
-            onPanelOpenChange(true)
-            withAnimation(.easeOut(duration: 0.15)) { isScrubbing = true }
+        /// Whether the OSD maps the scrubber / −10/+10 onto absolute wall clock
+        /// (live or Flussonic timeshift) instead of engine-relative seconds.
+        var usesAbsoluteScrub: Bool {
+            media.isLive || media.archiveWindowStart != nil
         }
 
-        /// Commit the seek and leave scrub mode, resuming playback if it had
-        /// been playing when scrubbing began.
-        func commitScrub() {
-            let target = min(max(scrubTarget, 0), max(clock.duration, 0))
-            coordinator.seek(to: target)
-            clock.current = target
-            finishScrub(resume: wasPlayingBeforeScrub)
+        /// Wall-clock scrub window for the active live / timeshift channel.
+        var liveTimeshiftWindow: (start: Date, end: Date)? {
+            guard let stream = liveStream, LiveTimeshift.canTimeshift(stream: stream) else { return nil }
+            return LiveTimeshift.scrubWindow(
+                stream: stream,
+                programStart: epgNow?.start,
+                now: Date()
+            )
         }
 
-        /// Abort the scrub (Menu press) without seeking, restoring the prior
-        /// play state.
-        func cancelScrub() {
-            finishScrub(resume: wasPlayingBeforeScrub)
+        var showsStartOver: Bool {
+            // Available whenever absolute archive scrub is possible; without EPG
+            // `startOverCurrentProgram` falls back to the archive window start.
+            usesAbsoluteScrub && canSeekMedia
         }
 
-        private func finishScrub(resume: Bool) {
-            scrubResetTask?.cancel()
-            scrubResetTask = nil
-            withAnimation(.easeOut(duration: 0.15)) { isScrubbing = false }
-            onPanelOpenChange(false)
-            if resume, !coordinator.isPlaying { onTogglePlay() }
-            focus = .scrubber
+        /// Previous / Next programme chips — archive/timeshift OSD.
+        var showsProgramJump: Bool {
+            usesAbsoluteScrub && canSeekMedia
+        }
+
+        /// Absolute date currently shown on the scrubber (preview while scrubbing).
+        var displayedAbsoluteDate: Date {
+            if controlSession.isScrubbing, let preview = controlSession.previewAbsoluteTime {
+                return preview
+            }
+            return LiveTimeshift.absolutePlaybackDate(
+                media: media,
+                playerTime: clock.current
+            )
+        }
+
+        /// Programme under the scrub preview (or under the playhead when idle).
+        /// Derived from the preloaded guide — never a network fetch.
+        var compactDisplayedProgram: OSDProgramInfo? {
+            OSDProgramInfo.at(displayedAbsoluteDate, in: channelEPGGuide)
+        }
+
+        /// Next programme after the displayed playhead / preview time.
+        var compactDisplayedNextProgram: OSDProgramInfo? {
+            OSDProgramInfo.next(after: displayedAbsoluteDate, in: channelEPGGuide)
+        }
+
+        /// Relative offset while scrubbing, e.g. `−11 мин 35 сек` / `+1 мин`.
+        var scrubPreviewDeltaLabel: String? {
+            guard controlSession.isScrubbing, usesAbsoluteScrub,
+                  let preview = controlSession.previewAbsoluteTime
+            else { return nil }
+            let origin = LiveTimeshift.absolutePlaybackDate(
+                media: media, playerTime: clock.current
+            )
+            return LiveTimeshift.liveOffsetLabel(preview.timeIntervalSince(origin))
+        }
+
+        /// Menu from the host: cancel exactly one layer
+        /// (scrub → seeking → panel → return-to-live for archive/timeshift).
+        /// Scrub preview: first Back cancels uncommitted seek; next Back → live.
+        func handleMenuFromHost() {
+            if controlSession.isScrubbing {
+                cancelScrub()
+                onResetHideTimer()
+                return
+            }
+            if controlSession.isSeekInFlight {
+                _ = controlSession.cancelSeek(mediaIsCatchup: media.isCatchup)
+                Task { @MainActor in
+                    focus = usesCompactLiveOSD ? .scrubber : .transport
+                }
+                onPanelOpenChange(openTab != nil)
+                onResetHideTimer()
+                return
+            }
+            if openTab != nil {
+                closePanel()
+                return
+            }
+            // Archive / timeshift: Back returns to live via unified returnToLive().
+            if media.isCatchup || LiveTimeshift.isTimeshiftSession(media) {
+                returnToLive(keepControls: false)
+            }
+        }
+
+        /// Compact OSD Select on the timeline: Pause/Play only — never scrub commit.
+        /// Auto-commit owns seek; Select during an in-flight commit is ignored.
+        func primarySelectAction() {
+            let action = TVCompactOSDSelectPolicy.resolve(
+                osdVisible: true,
+                isCommitInFlight: controlSession.isCommitInFlight,
+                isSeekInFlight: controlSession.isSeekInFlight
+            )
+            switch action {
+            case .openOSDOnly, .ignore:
+                return
+            case .togglePlay:
+                guard compactSelectGate.shouldAccept() else { return }
+                guard controlSession.allowsTogglePlay() else { return }
+                onResetHideTimer()
+                onTogglePlay()
+                if controlSession.isScrubbing {
+                    controlSession.notePlaybackDesireDuringPreview(
+                        isPlaying: coordinator.isPlaying
+                    )
+                }
+            }
+        }
+
+        /// ←/→ on compact live OSD: enter preview if needed, then nudge.
+        /// Auto-commit fires ~600 ms after the last nudge.
+        func handleCompactHorizontal(_ direction: MoveCommandDirection) {
+            guard !controlSession.isSeekInFlight,
+                  !controlSession.isCommitInFlight
+            else { return }
+            guard canSeekMedia else {
+                archiveBanner = String(localized: "Seeking unavailable")
+                onResetHideTimer()
+                return
+            }
+            if !controlSession.isScrubbing {
+                beginScrub()
+            }
+            moveScrub(direction)
+        }
+
+        /// Single entry for Apple MoveCommand and CEC/UIPress while compact OSD
+        /// is visible. ←/→ scrub; ↑/↓ SurfCursor (after cancelling preview/seek).
+        func handleCompactOSDMove(_ direction: MoveCommandDirection) {
+            guard usesCompactLiveOSD, openTab == nil else { return }
+            switch direction {
+            case .up, .down:
+                prepareAndSurfChannel(direction)
+            case .left, .right:
+                handleCompactHorizontal(direction)
+                onResetHideTimer()
+            default:
+                break
+            }
+        }
+
+        /// Cancel scrub preview / stale seek, then forward ↑/↓ to SurfCursor.
+        /// Keeps the OSD up; host `showControls` restarts the hide timer.
+        private func prepareAndSurfChannel(_ direction: MoveCommandDirection) {
+            guard media.isLive else {
+                onResetHideTimer()
+                return
+            }
+            _ = controlSession.prepareChannelSurfWhileOSDVisible(
+                mediaIsCatchup: media.isCatchup
+            )
+            applyCompactFocusToFocusState()
+            onChannelSurf?(direction)
             onResetHideTimer()
         }
 
-        /// Step the scrub target on a left/right press. The step grows with
-        /// sustained input in one direction and decays after a brief pause.
+        func syncCompactFocusModel(resetSelection: Bool) {
+            guard usesCompactLiveOSD else { return }
+            // Timeline always focusable for Select; scrub still gated by canSeek.
+            let actions = TVCompactOSDFocusModel.standardActions()
+            if resetSelection {
+                compactFocusModel = .initial(
+                    timelineAvailable: true,
+                    actions: actions
+                )
+                compactFocusInputGate.reset()
+                compactSelectGate.reset()
+            } else {
+                compactFocusModel.timelineAvailable = true
+                compactFocusModel.actions = actions
+                _ = compactFocusModel.reconcile()
+            }
+            applyCompactFocusToFocusState()
+        }
+
+        func applyCompactFocusToFocusState() {
+            switch compactFocusModel.zone {
+            case .timeline:
+                focus = .scrubber
+            case .actions:
+                // No shipped actions — fall back to timeline.
+                if compactFocusModel.availableActions.isEmpty {
+                    compactFocusModel.zone = .timeline
+                    focus = .scrubber
+                } else {
+                    focus = .scrubber
+                }
+            }
+        }
+
+        /// Classic / VOD Select toggles scrub mode. Compact live never calls this
+        /// for Select — it uses `primarySelectAction` (Pause/Play) instead.
+        func toggleScrub() {
+            if controlSession.isScrubbing {
+                commitScrub(hideAfterSeek: usesCompactLiveOSD, source: .select)
+            } else {
+                beginScrub()
+            }
+        }
+
+        /// Enter scrub mode. Absolute (live/timeshift) keeps playback running
+        /// so the picture does not blink; VOD still pauses for classic scrub.
+        func beginScrub() {
+            guard canSeekMedia else { return }
+            guard !controlSession.isSeekInFlight else { return }
+            controlSession.cancelAutoCommit()
+            let absolute = LiveTimeshift.absolutePlaybackDate(
+                media: media, playerTime: clock.current
+            )
+            let started = controlSession.beginScrub(
+                absolute: absolute,
+                windowStart: liveTimeshiftWindow?.start,
+                playerTime: clock.current,
+                isPlaying: coordinator.isPlaying
+            )
+            guard started else { return }
+            if !usesAbsoluteScrub,
+               controlSession.wasPlayingBeforeScrub,
+               coordinator.isPlaying
+            {
+                onTogglePlay()
+            }
+            Task { @MainActor in
+                focus = .scrubber
+            }
+            onPanelOpenChange(true)
+            onResetHideTimer()
+        }
+
+        /// Commit the scrub preview through the unified ScrubCommitPipeline.
+        /// - Parameter hideAfterSeek: after a successful seek, clear scrub panel
+        ///   chrome and restart the shared OSD hide timer (no second hide stage).
+        /// - Parameter source: Select vs auto-commit — mutually exclusive via `tryBeginCommit`.
+        func commitScrub(
+            hideAfterSeek: Bool = false,
+            source: TVPlayerControlSession.CommitSource = .select
+        ) {
+            guard controlSession.isScrubbing else { return }
+            guard controlSession.tryBeginCommit(source: source) else { return }
+            if usesAbsoluteScrub {
+                let target = controlSession.previewAbsoluteTime
+                    ?? LiveTimeshift.absolutePlaybackDate(media: media, playerTime: clock.current)
+                Task { @MainActor in
+                    await seekToAbsoluteTime(target, resumeAfter: true)
+                    if hideAfterSeek { onPanelOpenChange(false) }
+                    onResetHideTimer()
+                }
+                return
+            }
+            let target = min(max(controlSession.scrubTarget, 0), max(clock.duration, 0))
+            coordinator.seek(to: target)
+            clock.current = target
+            _ = controlSession.cancelScrub()
+            if controlSession.wasPlayingBeforeScrub, !coordinator.isPlaying {
+                onTogglePlay()
+            }
+            Task { @MainActor in focus = .transport }
+            if hideAfterSeek { onPanelOpenChange(false) }
+            onResetHideTimer()
+        }
+
+        /// −15 / +15 / rewind / forward — absolute scrub only nudges preview;
+        /// idle debounce auto-confirms (Select still commits immediately).
+        func seekByRelative(_ delta: TimeInterval) {
+            guard canSeekMedia else { return }
+            guard !controlSession.isSeekInFlight else { return }
+            if usesAbsoluteScrub {
+                if !controlSession.isScrubbing { beginScrub() }
+                guard controlSession.isScrubbing else { return }
+                applyPreviewDelta(delta)
+                controlSession.notePreviewNudged()
+                return
+            }
+            let target = min(max(clock.current + delta, 0), max(clock.duration, 0))
+            coordinator.seek(to: target)
+            clock.current = target
+            onResetHideTimer()
+        }
+
+        /// Nudge preview without seeking.
+        private func applyPreviewDelta(_ delta: TimeInterval) {
+            guard let stream = liveStream else { return }
+            let now = Date()
+            controlSession.applyPreviewDelta(
+                delta,
+                clamp: { LiveTimeshift.clamp($0, stream: stream, now: now) },
+                windowStart: liveTimeshiftWindow?.start
+            )
+            onResetHideTimer()
+        }
+
+        /// Single entry for every live/timeshift seek: scrub commit, Start Over.
+        /// Serialized through `controlSession` — rapid presses share one generation.
+        func seekToAbsoluteTime(_ targetDate: Date, resumeAfter: Bool = false) async {
+            guard let stream = liveStream,
+                  let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext)
+            else {
+                // Drop a Select/auto-commit that never reached `runSeek`.
+                if controlSession.isCommitInFlight {
+                    _ = controlSession.cancelScrub()
+                }
+                return
+            }
+
+            await controlSession.runSeek(reason: "seek-absolute") { generation in
+                await self.performAbsoluteSeek(
+                    targetDate,
+                    stream: stream,
+                    playlist: playlist,
+                    generation: generation,
+                    resumeAfter: resumeAfter
+                )
+            }
+        }
+
+        private func performAbsoluteSeek(
+            _ targetDate: Date,
+            stream: LiveStream,
+            playlist: Playlist,
+            generation: Int,
+            resumeAfter: Bool
+        ) async {
+            guard controlSession.isSeekGenerationCurrent(generation) else { return }
+
+            let now = Date()
+            let clamped = LiveTimeshift.clamp(targetDate, stream: stream, now: now)
+
+            // At / past the live edge → real live URL.
+            if now.timeIntervalSince(clamped) <= LiveTimeshift.liveEdgeSlack {
+                if media.isCatchup {
+                    await performReturnToLive(generation: generation, keepControls: true)
+                } else {
+                    controlSession.failSeek(mediaIsCatchup: false, keepControls: true)
+                }
+                if resumeAfter, !coordinator.isPlaying { onTogglePlay() }
+                Task { @MainActor in focus = .transport }
+                return
+            }
+
+            // Already on a timeshift clip whose manifest covers the target →
+            // in-engine seek (no media reload). Gate on clip bounds + seekable
+            // range — never `clock.duration > 1` alone.
+            if let start = media.archiveWindowStart,
+               media.isCatchup
+            {
+                let end = media.archiveWindowEnd
+                    ?? start.addingTimeInterval(max(clock.duration, LiveTimeshift.minimumClipDuration))
+                let seekableEnd = clock.duration > 0
+                    ? clock.duration
+                    : max(0, end.timeIntervalSince(start))
+                if let seekTo = LiveTimeshift.inClipSeekOffset(
+                    target: clamped,
+                    clipStart: start,
+                    clipEnd: end,
+                    seekableStart: 0,
+                    seekableEnd: seekableEnd
+                ) {
+                    guard controlSession.isSeekGenerationCurrent(generation) else { return }
+                    coordinator.seek(to: seekTo)
+                    clock.current = seekTo
+                    LiveTimeshiftDiagnostics.logRequest(
+                        channelName: stream.name,
+                        zoneID: TimeZone.autoupdatingCurrent.identifier,
+                        programStartLocal: epgNow.map { LiveTimeshift.wallClockString($0.start) },
+                        programStartAbsolute: epgNow?.start,
+                        requestedAbsolute: clamped,
+                        flussonicUTC: Int(start.timeIntervalSince1970),
+                        playerTime: seekTo
+                    )
+                    controlSession.finishSeek(mediaIsCatchup: true, keepControls: true)
+                    if resumeAfter, !coordinator.isPlaying { onTogglePlay() }
+                    Task { @MainActor in focus = .transport }
+                    onResetHideTimer()
+                    return
+                }
+            }
+
+            let clipEnd = max(clamped.addingTimeInterval(LiveTimeshift.minimumClipDuration), now)
+            await launchTimeshift(
+                stream: stream,
+                playlist: playlist,
+                programTitle: epgNow?.title,
+                start: clamped,
+                end: clipEnd,
+                generation: generation,
+                resumeAfter: resumeAfter
+            )
+        }
+
+        /// «С начала» — current programme from its EPG start (clamped to tvg-rec).
+        func startOverCurrentProgram() {
+            guard canSeekMedia, !controlSession.isSeekInFlight else { return }
+            guard let stream = liveStream else { return }
+            let now = Date()
+            guard let earliest = LiveTimeshift.archiveEarliest(stream: stream, now: now) else { return }
+            let programStart = epgNow?.start ?? earliest
+            let start = max(programStart, earliest)
+            guard start < now else { return }
+            Task { @MainActor in
+                await seekToAbsoluteTime(start, resumeAfter: true)
+            }
+        }
+
+        private func launchTimeshift(
+            stream: LiveStream,
+            playlist: Playlist,
+            programTitle: String?,
+            start: Date,
+            end: Date,
+            generation: Int,
+            resumeAfter: Bool
+        ) async {
+            guard controlSession.isSeekGenerationCurrent(generation) else { return }
+
+            let flussonicUTC = Int(start.timeIntervalSince1970)
+            LiveTimeshiftDiagnostics.logRequest(
+                channelName: stream.name,
+                zoneID: TimeZone.autoupdatingCurrent.identifier,
+                programStartLocal: epgNow.map { LiveTimeshift.wallClockString($0.start) },
+                programStartAbsolute: epgNow?.start,
+                requestedAbsolute: start,
+                flussonicUTC: flussonicUTC,
+                playerTime: clock.current
+            )
+
+            guard let newMedia = PlayableMedia.timeshift(
+                stream: stream,
+                playlist: playlist,
+                programTitle: programTitle,
+                start: start,
+                end: end
+            ) else {
+                archiveBanner = String(localized: "Archive unavailable for this time")
+                controlSession.failSeek(mediaIsCatchup: media.isCatchup, keepControls: true)
+                Task { @MainActor in focus = .transport }
+                return
+            }
+
+            // Start playback immediately — do not await probe/PDT on the critical path.
+            // Background probe only surfaces a banner if the URL later proves dead;
+            // never silent-fallback to live.
+            controlSession.noteMediaReload(reason: "launchTimeshift")
+            controlSession.finishSeek(mediaIsCatchup: true, keepControls: true)
+            onSelectMedia(newMedia)
+            Task { @MainActor in focus = .transport }
+            onResetHideTimer()
+
+            let probeURL = newMedia.url
+            let channelName = stream.name
+            let mode = stream.catchupMode
+            let hasSource = stream.catchupSource != nil
+            Task { @MainActor in
+                let reachable = await CatchupURLProbe.isReachable(probeURL)
+                guard controlSession.isSeekGenerationCurrent(generation) else { return }
+                if !reachable {
+                    archiveBanner = String(localized: "Archive unavailable for this time")
+                    CatchupDiagnostics.logBuildResult(
+                        channelName: channelName,
+                        mode: mode,
+                        hasSource: hasSource,
+                        success: false,
+                        mediaKind: "timeshift",
+                        reason: "probe-failed-async",
+                        safeURL: CatchupDiagnostics.safeURLDescription(probeURL.absoluteString)
+                    )
+                }
+                // PDT is diagnostics-only — never blocks archive start.
+                let pdt = await LiveTimeshiftDiagnostics.fetchFirstPDT(from: probeURL)
+                LiveTimeshiftDiagnostics.logPlaylistPDT(
+                    channelName: channelName,
+                    requestedAbsolute: start,
+                    programDateTime: pdt,
+                    playerTime: 0
+                )
+            }
+        }
+
+        /// Abort the scrub (Menu / ↑) without seeking.
+        func cancelScrub() {
+            let resume = controlSession.wasPlayingBeforeScrub && !usesAbsoluteScrub
+            guard controlSession.cancelScrub() else { return }
+            if resume, !coordinator.isPlaying { onTogglePlay() }
+            Task { @MainActor in focus = .transport }
+            onPanelOpenChange(openTab != nil)
+            onResetHideTimer()
+        }
+
+        /// Step the scrub preview on a left/right press.
         func moveScrub(_ direction: MoveCommandDirection) {
-            guard isScrubbing, clock.duration > 0 else { return }
+            guard controlSession.isScrubbing else { return }
             let sign: Double
             switch direction {
             case .left: sign = -1
             case .right: sign = 1
             default: return
             }
-            if direction != scrubLastDirection { scrubStepLevel = 0 }
-            scrubLastDirection = direction
-            scrubStepLevel = min(scrubStepLevel + 1, 40)
-            // A single tap nudges ~30s; a held d-pad ramps to ~20 min/press, so
-            // even a long movie crosses in a second or two of sustained input.
-            let step = 30.0 * Double(scrubStepLevel)
-            scrubTarget = min(max(scrubTarget + sign * step, 0), clock.duration)
-            onResetHideTimer()
+            guard let gateDirection = RemoteDirectionGate.Direction(direction) else { return }
+            let step = controlSession.noteScrubStep(
+                direction: gateDirection,
+                absoluteTimeline: usesAbsoluteScrub
+            )
 
-            scrubResetTask?.cancel()
-            scrubResetTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 450_000_000)
-                guard !Task.isCancelled else { return }
-                scrubStepLevel = 0
-                scrubLastDirection = nil
+            if usesAbsoluteScrub {
+                applyPreviewDelta(sign * step)
+            } else {
+                guard clock.duration > 0 else { return }
+                let next = min(max(controlSession.scrubTarget + sign * step, 0), clock.duration)
+                controlSession.setVODScrubTarget(next)
+                onResetHideTimer()
             }
+        }
+
+        /// Jump to the previous or next EPG programme relative to the playhead.
+        /// Falls back to ±30 minutes of absolute archive when EPG is missing.
+        func jumpToAdjacentProgram(forward: Bool) {
+            guard canSeekMedia, !controlSession.isSeekInFlight else { return }
+            let reference = displayedAbsoluteDate
+            if let target = adjacentProgramStart(forward: forward, from: reference) {
+                Task { @MainActor in
+                    await seekToAbsoluteTime(target, resumeAfter: true)
+                }
+                return
+            }
+            // No EPG neighbour — absolute nudge (30 minutes).
+            let delta: TimeInterval = forward ? 1800 : -1800
+            let fallback = reference.addingTimeInterval(delta)
+            Task { @MainActor in
+                await seekToAbsoluteTime(fallback, resumeAfter: true)
+            }
+        }
+
+        private func adjacentProgramStart(forward: Bool, from reference: Date) -> Date? {
+            guard let stream = liveStream,
+                  let epgId = stream.epgChannelId, !epgId.isEmpty
+            else { return nil }
+
+            let earliest = LiveTimeshift.archiveEarliest(stream: stream) ?? .distantPast
+            let now = Date()
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { $0.channelId == epgId },
+                sortBy: [SortDescriptor(\.start)]
+            )
+            let listings = (try? modelContext.fetch(descriptor)) ?? []
+            if forward {
+                guard let next = listings.first(where: { $0.start > reference.addingTimeInterval(2) })
+                else { return nil }
+                if next.start >= now.addingTimeInterval(-LiveTimeshift.liveEdgeSlack) {
+                    if media.isCatchup {
+                        returnToLive()
+                    }
+                    return nil
+                }
+                return max(next.start, earliest)
+            } else {
+                let past = listings.filter { $0.end <= reference.addingTimeInterval(2) }
+                guard let prev = past.last else {
+                    return epgNow.map { max($0.start, earliest) }
+                }
+                return max(prev.start, earliest)
+            }
+        }
+
+        /// When a live-rewind clip reaches its end, jump back to the live URL
+        /// exactly once per timeshift media (re-armed on `resetForNewStream`).
+        func autoReturnToLiveIfNeeded() {
+            guard LiveTimeshift.isTimeshiftSession(media),
+                  clock.duration > 0,
+                  clock.current >= clock.duration - 1.5,
+                  !controlSession.isScrubbing,
+                  !controlSession.isSeekInFlight,
+                  controlSession.tryConsumeAutoReturnToLive()
+            else { return }
+            returnToLive(keepControls: false)
         }
 
         // MARK: Actions
@@ -216,6 +767,49 @@
             onSelectMedia(newMedia)
         }
 
+        /// Leave catch-up / archive / timeshift and tune the live channel again.
+        /// Exactly one media swap; does not dismiss the player.
+        func returnToLive(keepControls: Bool = false) {
+            guard media.isCatchup || LiveTimeshift.isTimeshiftSession(media),
+                  liveStream != nil
+            else { return }
+            guard !controlSession.isSeekInFlight else { return }
+            TVArchiveResumeStore.clear(catchupID: media.id)
+            Task { @MainActor in
+                await controlSession.runSeek(reason: "return-to-live", asReturnToLive: true) { generation in
+                    await self.performReturnToLive(generation: generation, keepControls: keepControls)
+                }
+            }
+        }
+
+        private func performReturnToLive(generation: Int, keepControls: Bool) async {
+            guard controlSession.isSeekGenerationCurrent(generation) else { return }
+            guard let stream = liveStream,
+                  let playlist = LiveChannelNavigator.playlist(for: stream, in: modelContext),
+                  let newMedia = PlayableMedia.from(
+                      stream: stream, playlist: playlist, scope: media.channelScope
+                  )
+            else {
+                controlSession.failSeek(mediaIsCatchup: true, keepControls: keepControls)
+                return
+            }
+            withAnimation(.easeInOut(duration: 0.2)) { openTab = nil }
+            controlSession.noteMediaReload(reason: "returnToLive")
+            if controlSession.phase == .returningToLive {
+                controlSession.finishReturnToLive(keepControls: keepControls)
+            } else {
+                controlSession.finishSeek(mediaIsCatchup: false, keepControls: keepControls)
+            }
+            focus = usesCompactLiveOSD ? .scrubber : .transport
+            // One media swap only — stay in the player. Hide OSD when requested
+            // so the next Menu/Back can exit instead of only dismissing chrome.
+            if !keepControls {
+                onPanelOpenChange(false)
+                onHideControls?()
+            }
+            onSelectMedia(newMedia)
+        }
+
         func toggle(tab kind: TabKind) {
             withAnimation(.easeInOut(duration: 0.22)) {
                 openTab = (openTab == kind) ? nil : kind
@@ -225,6 +819,7 @@
                 onPanelOpenChange(true)
                 focus = .episode(episode?.id ?? seasonEpisodes.first?.id ?? "")
             case .recent:
+                ensureRecentChannelsLoaded()
                 onPanelOpenChange(true)
                 focus = .channel(liveStream?.id ?? recentChannels.first?.id ?? "")
             case .info:
@@ -234,6 +829,14 @@
                 onPanelOpenChange(false)
                 focus = .tab(tabKinds.firstIndex(of: kind) ?? 0)
             }
+        }
+
+        /// Recent rail is deferred from `resolveContent` so channel surfing
+        /// doesn't pay for it; load once when the panel actually opens.
+        private func ensureRecentChannelsLoaded() {
+            guard recentChannels.isEmpty, media.isLive else { return }
+            recentChannels = TVPlayerContent.recentChannels(in: modelContext, restriction: restriction)
+            recentNowTitles = TVPlayerContent.nowProgrammeTitles(for: recentChannels, in: modelContext)
         }
 
         func closePanel() {
@@ -305,6 +908,14 @@
         }
 
         var infoPrimaryAction: TVPlayerInfoAction? {
+            if media.isLive || LiveTimeshift.isTimeshiftSession(media) {
+                guard showsStartOver else { return nil }
+                return TVPlayerInfoAction(title: "Start Over", systemImage: "backward.end.fill") {
+                    startOverCurrentProgram()
+                    closePanel()
+                    onResetHideTimer()
+                }
+            }
             guard !media.isLive else { return nil }
             return TVPlayerInfoAction(title: "Restart", systemImage: "gobackward") {
                 coordinator.seek(to: 0)

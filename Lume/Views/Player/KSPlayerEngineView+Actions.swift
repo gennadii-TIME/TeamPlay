@@ -29,6 +29,9 @@ extension KSPlayerEngineView {
     }
 
     func togglePlay() {
+        #if os(tvOS)
+            guard controlSession.allowsTogglePlay() else { return }
+        #endif
         let playing: Bool
         #if os(tvOS)
             playing = engine.isPlaying
@@ -72,6 +75,9 @@ extension KSPlayerEngineView {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isControlsVisible = false
             }
+            #if os(tvOS)
+                controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+            #endif
         }
     }
 

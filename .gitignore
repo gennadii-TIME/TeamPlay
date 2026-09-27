@@ -28,5 +28,6 @@ lefthook-local.yml
 
 # Vendored engine local build bits
 LumeEngine/build/
-docs/build-logs/*.log
-docs/build-logs/xcode-version.txt
+
+# Local platform build / UITest dumps (contain machine paths; regenerate via Scripts/)
+docs/build-logs/

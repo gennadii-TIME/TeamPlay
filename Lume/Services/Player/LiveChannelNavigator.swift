@@ -74,6 +74,18 @@ enum LiveChannelNavigator {
     /// happens, and `LiveChannelNavigatorCollationTests` pins it.
     private static let tiePage = 64
 
+    /// Cached position in a surf ring so rapid ↑/↓ presses skip the bisect.
+    /// Rebuilt whenever the playing channel leaves the ring (category change,
+    /// sort change, or a jump that didn't come from `step`).
+    struct SurfCursor: Equatable {
+        let streamId: String
+        let playlistID: UUID
+        let scope: LiveChannelScope?
+        let sort: ContentSortOption
+        let index: Int
+        let count: Int
+    }
+
     /// The playlist that owns a live stream. Stream `id`s are prefixed with the
     /// owning playlist's UUID at sync time (see `ContentSyncManager`).
     static func playlist(for stream: LiveStream, in context: ModelContext) -> Playlist? {
@@ -105,6 +117,11 @@ enum LiveChannelNavigator {
             case (.channelUpDown, .down), (.listOrder, .up): -1
             }
         }
+
+        /// Same as `offset(in:)` for callers outside this file (channel surf).
+        func listOffset(in mode: LiveSurfMode) -> Int {
+            offset(in: mode)
+        }
     }
 
     /// The channel one press of `direction` away, within the list `media` was
@@ -120,6 +137,139 @@ enum LiveChannelNavigator {
         in context: ModelContext
     ) -> PlayableMedia? {
         adjacentMedia(for: media, offset: direction.offset(in: mode), sort: sort, restriction: restriction, in: context)
+    }
+
+    /// Steps `offset` channels from `media`, updating `cursor` so the next press
+    /// is a single-row fetch instead of a full bisect. Returns `nil` when the
+    /// ring has nowhere to go (same cases as `adjacentMedia`).
+    static func step(
+        from media: PlayableMedia,
+        offset: Int,
+        sort: ContentSortOption,
+        restriction: ContentRestriction,
+        cursor: inout SurfCursor?,
+        in context: ModelContext
+    ) -> PlayableMedia? {
+        guard offset != 0 else { return nil }
+        guard case let .live(id) = media.contentRef else {
+            cursor = nil
+            return nil
+        }
+
+        if let cached = cursor,
+           cached.streamId == id,
+           cached.sort == sort,
+           cached.scope == media.channelScope,
+           cached.scope != .recentlyWatched,
+           cached.count > 1,
+           let stepped = stepFromCursor(cached, offset: offset, media: media, restriction: restriction, in: context)
+        {
+            cursor = stepped.cursor
+            return stepped.media
+        }
+
+        guard let located = locateAdjacent(
+            for: media, offset: offset, sort: sort, restriction: restriction, in: context
+        ) else {
+            cursor = nil
+            return nil
+        }
+        cursor = located.cursor
+        return located.media
+    }
+
+    private static func stepFromCursor(
+        _ cursor: SurfCursor,
+        offset: Int,
+        media: PlayableMedia,
+        restriction: ContentRestriction,
+        in context: ModelContext
+    ) -> (media: PlayableMedia, cursor: SurfCursor)? {
+        let playlistID = cursor.playlistID
+        let streamId = cursor.streamId
+        var playlistDescriptor = FetchDescriptor<Playlist>(
+            predicate: #Predicate<Playlist> { $0.id == playlistID }
+        )
+        playlistDescriptor.fetchLimit = 1
+        guard let playlist = try? context.fetch(playlistDescriptor).first else { return nil }
+
+        let prefix = "\(playlist.id.uuidString)-"
+        let scope: LiveChannelScope
+        if let cachedScope = cursor.scope {
+            scope = cachedScope
+        } else {
+            var streamDescriptor = FetchDescriptor<LiveStream>(
+                predicate: #Predicate { $0.id == streamId }
+            )
+            streamDescriptor.fetchLimit = 1
+            guard let categoryId = try? context.fetch(streamDescriptor).first?.categoryId else {
+                return nil
+            }
+            scope = .category(categoryId)
+        }
+
+        let descriptor = scopeDescriptor(
+            scope: scope, sort: cursor.sort, playlistPrefix: prefix,
+            restriction: restriction, admittingHidden: nil
+        )
+        let position = (cursor.index + offset % cursor.count + cursor.count) % cursor.count
+        guard let target = try? context.fetch(positionDescriptor(descriptor, at: position)).first,
+              let playable = PlayableMedia.from(
+                  stream: target, playlist: playlist, scope: media.channelScope
+              )
+        else {
+            return nil
+        }
+        let next = SurfCursor(
+            streamId: target.id,
+            playlistID: cursor.playlistID,
+            scope: media.channelScope,
+            sort: cursor.sort,
+            index: position,
+            count: cursor.count
+        )
+        return (playable, next)
+    }
+
+    private static func locateAdjacent(
+        for media: PlayableMedia,
+        offset: Int,
+        sort: ContentSortOption,
+        restriction: ContentRestriction,
+        in context: ModelContext
+    ) -> (media: PlayableMedia, cursor: SurfCursor)? {
+        guard case let .live(id) = media.contentRef else { return nil }
+        var currentDescriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
+        currentDescriptor.fetchLimit = 1
+        guard let current = try? context.fetch(currentDescriptor).first,
+              let playlist = playlist(for: current, in: context) else { return nil }
+
+        guard let located = ring(
+            around: current,
+            media: media,
+            sort: sort,
+            restriction: restriction,
+            playlist: playlist,
+            in: context
+        ) else { return nil }
+
+        let ring = located.ring
+        guard ring.count > 1 else { return nil }
+        let position = (located.index + offset + ring.count) % ring.count
+        guard let target = ring.row(at: position, in: context),
+              let playable = PlayableMedia.from(
+                  stream: target, playlist: playlist, scope: media.channelScope
+              )
+        else { return nil }
+        let cursor = SurfCursor(
+            streamId: target.id,
+            playlistID: playlist.id,
+            scope: media.channelScope,
+            sort: sort,
+            index: position,
+            count: ring.count
+        )
+        return (playable, cursor)
     }
 
     /// The playable channel `offset` positions away from `media` within the list

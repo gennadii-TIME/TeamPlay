@@ -26,9 +26,15 @@ enum M3UFieldFixtures {
         tvgId: String? = "bbc.one.uk",
         logo: String? = "http://provider.example.com/logos/bbc1.png",
         group: String? = "News",
-        type: String? = nil
+        type: String? = nil,
+        catchup: String? = nil,
+        catchupSource: String? = nil,
+        catchupDays: Int? = nil
     ) -> M3UEntry {
-        M3UEntry(name: name, url: url, tvgId: tvgId, logo: logo, group: group, type: type)
+        M3UEntry(
+            name: name, url: url, tvgId: tvgId, logo: logo, group: group, type: type,
+            catchup: catchup, catchupSource: catchupSource, catchupDays: catchupDays
+        )
     }
 
     static func movieEntry(
@@ -121,6 +127,48 @@ struct M3ULiveStreamFieldTests {
         #expect(stream.epgChannelId == "bbc.one.uk")
         #expect(stream.directURL == "http://provider.example.com/live/9876")
         #expect(stream.categoryId == Self.category)
+    }
+
+    @Test func `known catchup scheme is written onto the live stream`() async throws {
+        let container = try makeTestContainer()
+        let manager = ContentSyncManager(modelContainer: container)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let stream = LiveStream(id: "live-catchup", streamId: 2, name: "Chan")
+        context.insert(stream)
+        try context.save()
+
+        await manager.applyM3ULiveStreamFields(
+            from: M3UFieldFixtures.entry(catchup: "shift", catchupDays: 7),
+            to: stream,
+            categoryId: Self.category
+        )
+
+        #expect(stream.tvArchive == 1)
+        #expect(stream.tvArchiveDuration == 7)
+        #expect(stream.catchupMode == "shift")
+        #expect(stream.catchupSource == nil)
+    }
+
+    @Test func `unknown catchup scheme clears archive fields`() async throws {
+        let container = try makeTestContainer()
+        let manager = ContentSyncManager(modelContainer: container)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let stream = LiveStream(id: "live-bad-catchup", streamId: 3, name: "Chan",
+                                tvArchive: 1, tvArchiveDuration: 7)
+        stream.catchupMode = "shift"
+        context.insert(stream)
+        try context.save()
+
+        await manager.applyM3ULiveStreamFields(
+            from: M3UFieldFixtures.entry(catchup: "acme-private", catchupDays: 7),
+            to: stream,
+            categoryId: Self.category
+        )
+
+        #expect(stream.tvArchive == 0)
+        #expect(stream.catchupMode == nil)
     }
 
     @Test func `unchanged live stream entry leaves the context clean`() async throws {

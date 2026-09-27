@@ -40,6 +40,17 @@ import SwiftUI
                         .disabled(!premium.isPremium)
                     TVOptionToggleRow(title: "Show Skip Intro Button", isOn: $showSkipIntroButton)
                         .disabled(!premium.isPremium)
+                    TVOptionCycleRow(
+                        title: "Playback Buffer",
+                        valueLabel: PlayerSettings.PlaybackBufferPreference.resolve(raw: playbackBufferRaw).displayName
+                    ) {
+                        playbackBufferRaw = nextPlaybackBufferRaw(after: playbackBufferRaw)
+                    }
+                    Text("A larger buffer reduces stalls on unstable networks, but increases startup time and live delay. Changes apply the next time a stream starts.")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                        .padding(.top, 6)
                     if !premium.isPremium {
                         Button {
                             presentPaywall(.playbackControls)

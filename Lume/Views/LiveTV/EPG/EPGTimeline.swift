@@ -141,10 +141,10 @@ struct EPGChannelRow: Identifiable {
     let stream: LiveStream
     let name: String
     let logoURL: URL?
-    /// Whether the channel can serve catch-up at all (advertised archive,
-    /// Xtream stream) — mirrors the `PlayableMedia.catchup` guards.
+    /// Whether the channel can serve catch-up at all (advertised archive with a
+    /// buildable scheme — Xtream or known m3u catch-up).
     let catchupCapable: Bool
-    /// How many days the archive reaches back (≥ 1 when `catchupCapable`).
+    /// How many days the archive reaches back (0 when unavailable).
     let archiveDays: Int
     let cells: [EPGProgramCell]
 
@@ -176,8 +176,8 @@ enum EPGGridBuilder {
                 stream: stream,
                 name: stream.name,
                 logoURL: URL(string: stream.streamIcon ?? ""),
-                catchupCapable: stream.tvArchive > 0 && stream.directURL == nil,
-                archiveDays: max(1, stream.tvArchiveDuration),
+                catchupCapable: stream.tvArchive > 0 && stream.tvArchiveDuration > 0,
+                archiveDays: max(0, stream.tvArchiveDuration),
                 cells: cells
             )
         }

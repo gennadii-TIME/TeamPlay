@@ -30,6 +30,13 @@
                     }
                 }
 
+                Picker("Playback Buffer", selection: $playbackBufferRaw) {
+                    ForEach(PlayerSettings.PlaybackBufferPreference.allCases) { preference in
+                        Text(preference.displayName).tag(preference.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+
                 preferredAudioLanguageRow
 
                 NavigationLink("VLCKit Options") { VLCEngineSettingsScreen() }
@@ -38,7 +45,7 @@
             } header: {
                 Text("Player")
             } footer: {
-                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played.")
+                Text("Lume plays each stream with your preferred engine and falls back to the next if it can't be played.\n\nA larger playback buffer reduces stalls on unstable networks, but increases startup time and live delay. Changes apply the next time a stream starts.")
             }
         }
 

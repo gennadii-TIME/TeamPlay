@@ -15,7 +15,8 @@ import SwiftUI
 
     /// The top-level settings categories shown in the tvOS sidebar.
     enum SettingsCategory: String, CaseIterable, Identifiable {
-        case premium, playlists, profiles, content, home, sports, epg, search, integrations, player, storage, about
+        case premium, playlists, profiles, content, home, interface, sports, epg, search, integrations, player, storage,
+            about
 
         var id: String {
             rawValue
@@ -28,6 +29,7 @@ import SwiftUI
             case .profiles: "Profiles"
             case .content: "Content"
             case .home: "Home"
+            case .interface: "Interface"
             case .sports: "Sports"
             case .epg: "TV Guide"
             case .search: "Search"
@@ -84,6 +86,45 @@ import SwiftUI
             let cycle = LiveSurfMode.allCases.map(\.rawValue)
             guard let index = cycle.firstIndex(of: raw) else { return LiveSurfMode.default.rawValue }
             return cycle[(index + 1) % cycle.count]
+        }
+
+        /// Advances Automatic → 1s → 3s → 5s → 10s → Automatic.
+        func nextPlaybackBufferRaw(after raw: String) -> String {
+            let cycle = PlayerSettings.PlaybackBufferPreference.allCases.map(\.rawValue)
+            guard let index = cycle.firstIndex(of: raw) else {
+                return PlayerSettings.PlaybackBufferPreference.default.rawValue
+            }
+            return cycle[(index + 1) % cycle.count]
+        }
+
+        /// OSD chrome timing for the live player panel.
+        var tvInterfaceDetail: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                TVSettingsSectionLabel("Interface")
+                TVOptionCycleRow(
+                    title: "Panel Display Time",
+                    valueLabel: String(
+                        format: String(localized: "%lld seconds"),
+                        Int64(PlayerSettings.OSD.clamped(osdHideDelaySeconds))
+                    )
+                ) {
+                    osdHideDelaySeconds = nextOSDHideDelaySeconds(after: osdHideDelaySeconds)
+                }
+                Text("How long the player panel stays visible without input. Any action while it is open restarts the timer.")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, TVSettingsMetrics.rowHPadding)
+                    .padding(.top, 6)
+            }
+        }
+
+        func nextOSDHideDelaySeconds(after raw: Int) -> Int {
+            let options = PlayerSettings.OSD.hideDelaySecondsOptions
+            let current = PlayerSettings.OSD.clamped(raw)
+            guard let index = options.firstIndex(of: current) else {
+                return PlayerSettings.OSD.hideDelaySecondsDefault
+            }
+            return options[(index + 1) % options.count]
         }
 
         var tvAboutDetail: some View {

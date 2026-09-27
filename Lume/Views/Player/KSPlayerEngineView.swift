@@ -3,6 +3,9 @@ import KSPlayer
 import OSLog
 import SwiftData
 import SwiftUI
+#if canImport(UIKit)
+    import UIKit
+#endif
 
 /// KSPlayer-backed video host.
 ///
@@ -76,6 +79,11 @@ struct KSPlayerEngineView: View {
     /// True while the engine is preparing or (re)buffering, so the spinner shows
     /// both on first open and on a mid-stream stall.
     @State var isBuffering = true
+    /// Last decoded frame held across a confirmed timeshift URL swap so the
+    /// viewer does not see Color.black while the new Flussonic playlist joins.
+    #if canImport(UIKit)
+        @State var freezeFrame: UIImage?
+    #endif
     /// Per-tick bookkeeping for the 10 Hz `onPlay` callback (progress detection
     /// and the clock-drift watchdog). A reference type held in `@State` on
     /// purpose: mutating its properties — unlike writing `@State` scalars —
@@ -127,6 +135,11 @@ struct KSPlayerEngineView: View {
         /// Republishes KSPlayer state to the shared overlay (`isPlaying`,
         /// `videoInfo`) and bridges its track / seek API.
         @StateObject var engine = KSTVPlaybackEngine()
+        /// Exclusive OSD / scrub / seek / timeshift phase machine shared with
+        /// the overlay so Menu, Play/Pause and channel surf cannot race.
+        @StateObject var controlSession = TVPlayerControlSession()
+        @StateObject private var timedMute = TimedMuteController()
+        @StateObject var surfRouter = TVChannelSurfInputRouter()
         /// While an overlay panel (episodes / info) is open the controls must
         /// not auto-hide out from under the viewer.
         @State var isPanelOpen = false
@@ -137,6 +150,7 @@ struct KSPlayerEngineView: View {
         /// The full channel browser (categories + channels) raised by a left
         /// press while watching live TV with the controls hidden.
         @State var isChannelBrowserOpen = false
+        @State var isProgramGuideOpen = false
         /// Drives focus onto the transparent tap-catcher once the controls
         /// auto-hide, so the Siri remote can summon them again.
         @FocusState var catcherFocused: Bool
@@ -164,7 +178,7 @@ struct KSPlayerEngineView: View {
         @Environment(\.dismissWindow) var dismissWindow
     #endif
 
-    let autoHideInterval: TimeInterval = 4
+    var autoHideInterval: TimeInterval { PlayerSettings.OSD.hideDelayInterval }
     /// How long to wait for the first frame before declaring a stream dead. The
     /// engine legitimately sits in `.preparing`/`.buffering` for ~10–20s on a
     /// healthy open, so this is set well clear of that. The reconnect budget
@@ -200,11 +214,13 @@ struct KSPlayerEngineView: View {
 
                 KSVideoPlayer(coordinator: coordinator, url: media.url, options: options)
                     .onStateChanged { _, state in
-                        // Defer all state mutations so they never run inside a
-                        // SwiftUI view-update pass, which would trigger the
-                        // "Modifying state during view update" / "Publishing
-                        // changes from within view updates" runtime warnings.
-                        DispatchQueue.main.async {
+                        // Defer past any in-flight SwiftUI update. Publishing
+                        // `@Published` / `@Observable` (and host `@State`)
+                        // synchronously from KSPlayer's callback — even via
+                        // `DispatchQueue.main.async` when already on main —
+                        // trips "Publishing changes from within view updates"
+                        // and destabilises FocusState on device.
+                        Task { @MainActor in
                             isPlaying = (state == .bufferFinished)
                             updateLoadingState(state)
                             engine.syncState(state)
@@ -212,13 +228,7 @@ struct KSPlayerEngineView: View {
                         }
                     }
                     .onPlay { current, total in
-                        // Defer for the same reason as onStateChanged; also
-                        // prevents rapid back-to-back transitions (e.g.
-                        // bufferFinished → buffering) from publishing two
-                        // @ObservableObject changes in the same SwiftUI frame,
-                        // which triggers "onChange updated multiple times per
-                        // frame" warnings.
-                        DispatchQueue.main.async {
+                        Task { @MainActor in
                             if !isSeeking {
                                 if current.isFinite {
                                     clock.current = current
@@ -234,12 +244,23 @@ struct KSPlayerEngineView: View {
                             // per-tick play callback until it first lands, so
                             // steady playback doesn't re-read tracks/codec each
                             // tick.
-                            if engine.videoInfo == nil {
-                                engine.refreshVideoInfo()
-                            }
+                            engine.chaseVideoInfo(at: current)
                         }
                     }
                     .ignoresSafeArea()
+
+                #if canImport(UIKit)
+                    // Hold the outgoing frame over Color.black until the new
+                    // stream paints its first frame (confirmed timeshift seek).
+                    if let freezeFrame {
+                        Image(uiImage: freezeFrame)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
+                #endif
 
                 // KSPlayer decodes the selected subtitle into
                 // `subtitleModel.parts`, but the bare `KSVideoPlayer` above draws
@@ -261,9 +282,12 @@ struct KSPlayerEngineView: View {
                         onResetHideTimer: { resetHideTimer() },
                         onSelectMedia: { onSelectMedia?($0) },
                         onPanelOpenChange: { setPanelOpen($0) },
-                        onSwitchChannel: { switchLiveChannel($0) },
+                        controlSession: controlSession,
+                        timedMute: timedMute,
                         mediaSwapper: mediaSwapper, onCompleteCurrentItem: { onCompleteCurrentItem?() },
-                        onSearchSubtitles: subtitleSearchAction
+                        onSearchSubtitles: subtitleSearchAction,
+                        onChannelSurf: { handleChannelSurfInput($0, source: .moveCommand) },
+                        onHideControls: { hideControls() }
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
@@ -279,9 +303,17 @@ struct KSPlayerEngineView: View {
                     channelBrowser
                 }
 
+                if isProgramGuideOpen {
+                    programGuide
+                }
+
                 if isBuffering {
-                    PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
-                        .transition(.opacity)
+                    // With a held freeze-frame the last picture stays up —
+                    // skip the big spinner so it does not flash over it.
+                    if freezeFrame == nil {
+                        PlayerLoadingIndicator(title: hasStartedPlayback ? nil : media.title)
+                            .transition(.opacity)
+                    }
                 }
 
                 if loadFailed {
@@ -300,6 +332,18 @@ struct KSPlayerEngineView: View {
                 attachNowPlayingTransport()
                 scheduleHide()
                 startStartupWatchdog()
+                #if os(tvOS)
+                    TVChannelSurfPressRelay.shared.onArrowPress = { direction, source in
+                        if isChannelBrowserOpen || isProgramGuideOpen || isPanelOpen {
+                            return
+                        }
+                        if isControlsVisible {
+                            TVCompactOSDNavRelay.shared.handleArrow(direction)
+                        } else {
+                            handleChannelSurfInput(direction, source: source)
+                        }
+                    }
+                #endif
             }
             .onDisappear {
                 hideTask?.cancel()
@@ -309,6 +353,11 @@ struct KSPlayerEngineView: View {
                 PlaybackQoE.shared.endSession()
                 NowPlayingService.shared.detachTransport(owner: coordinator)
                 coordinator.resetPlayer()
+                #if os(tvOS)
+                    TVChannelSurfPressRelay.shared.onArrowPress = nil
+                    TVCompactOSDNavRelay.shared.onArrow = nil
+                    surfRouter.reset()
+                #endif
             }
             .onChange(of: engine.isPlaying) { _, _ in
                 resetHideTimer()
@@ -321,13 +370,22 @@ struct KSPlayerEngineView: View {
                     coordinator.playerLayer?.pause()
                 }
             }
-            .onChange(of: media) { _, _ in
+            .onChange(of: media) { oldMedia, newMedia in
+                // Capture the last frame *before* KSPlayer tears down the old
+                // URL so a confirmed timeshift seek does not flash Color.black.
+                captureFreezeFrame()
                 // The host swapped the stream (KSPlayer reloads its URL
                 // automatically). Reset local scrubbing / panel state.
                 isSeeking = false
                 seekPosition = 0
                 isPanelOpen = false
-                hasStartedPlayback = false
+                // Keep the OSD up across live↔timeshift URL swaps — dropping
+                // hasStartedPlayback hid the controls and looked like a blink.
+                let keepChrome = oldMedia.isLive || oldMedia.isCatchup
+                    || newMedia.isLive || newMedia.isCatchup
+                if !keepChrome {
+                    hasStartedPlayback = false
+                }
                 hasSeenReadyToPlay = false
                 isBuffering = true
                 loadFailed = false
@@ -335,6 +393,11 @@ struct KSPlayerEngineView: View {
                 cancelStallWatchdog()
                 reconnector.reset()
                 engine.reset()
+                controlSession.resetForNewStream(mediaIsCatchup: newMedia.isCatchup)
+                if keepChrome || isControlsVisible {
+                    controlSession.noteControlsOpened(mediaIsCatchup: newMedia.isCatchup)
+                }
+                timedMute.reassert { engine.isMuted = $0 }
                 startStartupWatchdog()
                 resetHideTimer()
             }
@@ -364,17 +427,19 @@ struct KSPlayerEngineView: View {
             }
             .buttonStyle(KSInvisibleButtonStyle())
             // Yield focus to the failure overlay's buttons when a stream dies.
-            .disabled(isControlsVisible || isChannelBrowserOpen || loadFailed)
+            .disabled(isControlsVisible || isChannelBrowserOpen || isProgramGuideOpen || loadFailed)
             .focused($catcherFocused)
             .tvRemoteMoveCommand { direction in
-                // Watching live TV with the controls hidden, left opens the
-                // channel browser, up/down surf adjacent channels and right
-                // recalls the last channel watched. Any other move summons
-                // the controls.
-                if media.isLive, direction == .left {
+                // Only while controls are hidden (this catcher is disabled when
+                // the OSD is up). ↑/↓ must never surf once the OSD owns focus —
+                // that lives in TVPlayerControlsOverlay's focus path.
+                // TVTeam mapping with OSD closed: ← channels, → EPG, ↑/↓ surf.
+                if media.allowsLiveTVChrome, direction == .left {
                     openChannelBrowser()
-                } else if media.isLive, direction == .up || direction == .down || direction == .right {
-                    switchLiveChannel(direction)
+                } else if media.allowsLiveTVChrome, direction == .right {
+                    openProgramGuide()
+                } else if media.isLive, direction == .up || direction == .down {
+                    handleChannelSurfInput(direction, source: .moveCommand)
                 } else {
                     showControls()
                 }
@@ -384,6 +449,7 @@ struct KSPlayerEngineView: View {
         func showControls() {
             guard !isControlsVisible else { resetHideTimer(); return }
             withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = true }
+            controlSession.noteControlsOpened(mediaIsCatchup: media.isCatchup)
             scheduleHide()
         }
 
@@ -392,15 +458,29 @@ struct KSPlayerEngineView: View {
         private func hideControls() {
             hideTask?.cancel()
             withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+            controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
         }
 
         private func handleMenuPress() {
             if loadFailed {
                 closePlayer()
+            } else if isProgramGuideOpen {
+                closeProgramGuide()
             } else if isChannelBrowserOpen {
                 closeChannelBrowser()
-            } else if isPanelOpen {
+            } else if controlSession.capturesMenu || isPanelOpen {
+                // One layer: scrub → cancel seek → panel.
                 panelCloseToken += 1
+            } else if media.isCatchup {
+                // Archive: Menu returns to live first (OSD open or closed);
+                // a second Menu on live then exits.
+                if !isControlsVisible {
+                    isControlsVisible = true
+                    controlSession.noteControlsOpened(mediaIsCatchup: true)
+                    Task { @MainActor in panelCloseToken += 1 }
+                } else {
+                    panelCloseToken += 1
+                }
             } else if isControlsVisible {
                 hideControls()
             } else {
