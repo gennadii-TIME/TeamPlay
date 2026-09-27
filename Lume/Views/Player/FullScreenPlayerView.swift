@@ -537,6 +537,9 @@ struct FullScreenPlayerView: View {
         let total = clock.duration
         let previous = pendingProgressWrite
         pendingProgressWrite = Task { @MainActor in
+            // Let the presenting UI reclaim focus before the store merge from
+            // `touchLive` / VOD progress lands on the main context.
+            await Task.yield()
             await previous?.value
             let completion = await writer.record(
                 ref: ref, progress: now, duration: total, force: force

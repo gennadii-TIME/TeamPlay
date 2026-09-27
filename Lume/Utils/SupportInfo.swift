@@ -15,7 +15,7 @@ import Foundation
 
 nonisolated enum SupportInfo {
     static let website = "https://github.com/gennadii-TIME/TeamPlay"
-    static let email = "gennadiistepanov@gmail.com"
+    static let email = "support@tinika.lv"
 
     /// App Store listing placeholders until TeamPlay ships its own listing.
     static let appStore = "https://github.com/gennadii-TIME/TeamPlay"

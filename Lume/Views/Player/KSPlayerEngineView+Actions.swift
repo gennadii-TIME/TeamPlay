@@ -61,22 +61,38 @@ extension KSPlayerEngineView {
     func scheduleHide() {
         hideTask?.cancel()
         #if os(tvOS)
-            guard engine.isPlaying, !isPanelOpen else { return }
+            // Duration-only timer: playback clock / isPlaying must not gate or
+            // restart hide. Scrub/seek/panel pin the chrome via isHideBlocked.
+            guard !TVOSDAutoHidePolicy.isHideBlocked(
+                isControlsVisible: isControlsVisible,
+                isPanelOpen: isPanelOpen,
+                isScrubbing: controlSession.isScrubbing,
+                isSeekInFlight: controlSession.isSeekInFlight
+            ) else { return }
         #else
             guard isPlaying, !PlayerControlsAutoHide.isSuppressed else { return }
         #endif
+        let delay = autoHideInterval
         hideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled else { return }
             #if os(tvOS)
-                guard !Task.isCancelled, engine.isPlaying else { return }
-            #else
-                guard !Task.isCancelled, isPlaying else { return }
-            #endif
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isControlsVisible = false
-            }
-            #if os(tvOS)
+                guard !TVOSDAutoHidePolicy.isHideBlocked(
+                    isControlsVisible: isControlsVisible,
+                    isPanelOpen: isPanelOpen,
+                    isScrubbing: controlSession.isScrubbing,
+                    isSeekInFlight: controlSession.isSeekInFlight
+                ) else { return }
+                isPanelOpen = false
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isControlsVisible = false
+                }
                 controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
+            #else
+                guard isPlaying else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isControlsVisible = false
+                }
             #endif
         }
     }

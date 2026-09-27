@@ -359,9 +359,8 @@ struct KSPlayerEngineView: View {
                     surfRouter.reset()
                 #endif
             }
-            .onChange(of: engine.isPlaying) { _, _ in
-                resetHideTimer()
-            }
+            // Playback state flips (buffering ↔ playing) must not restart the
+            // OSD hide timer — only user interaction / panel close do.
             .onChange(of: scenePhase) { _, phase in
                 // The Home button backgrounds the app without calling
                 // onDisappear, so pause here to stop audio when the player
@@ -457,6 +456,7 @@ struct KSPlayerEngineView: View {
         /// second Menu press, with the controls hidden, dismisses the player.
         private func hideControls() {
             hideTask?.cancel()
+            isPanelOpen = false
             withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
             controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
         }

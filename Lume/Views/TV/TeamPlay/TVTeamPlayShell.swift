@@ -149,6 +149,14 @@
             .fullScreenCover(item: $playingMedia) { media in
                 FullScreenPlayerView(media: media)
             }
+            .onChange(of: playingMedia?.id) { previous, current in
+                // Browser keeps its focus-move cache warm; refresh recents after
+                // teardown has yielded so ↑/↓ is not competing with the save.
+                guard previous != nil, current == nil else { return }
+                NotificationCenter.default.post(
+                    name: .teamPlayPlaybackDidDismiss, object: nil
+                )
+            }
             .overlay {
                 if let pending = pendingResume {
                     TVResumeWatchingOverlay(
@@ -393,6 +401,12 @@
                 programTitle: catchup.subtitle ?? catchup.title
             )
         }
+    }
+
+    extension Notification.Name {
+        /// Posted when TeamPlay dismisses the full-screen player so the channel
+        /// browser can refresh recents after teardown yields.
+        static let teamPlayPlaybackDidDismiss = Notification.Name("lume.teamPlayPlaybackDidDismiss")
     }
 
 #endif

@@ -8,7 +8,6 @@
 //  offers has to be built here.
 //
 
-import SwiftData
 import SwiftUI
 
 extension View {
@@ -56,17 +55,5 @@ enum FavoriteMenuItems {
         Button(role: .destructive, action: action) {
             Label("Remove from Recently Watched", systemImage: "clock.badge.xmark")
         }
-    }
-}
-
-/// Flips a channel's favorite flag. Live streams toggle the flag alone — unlike
-/// movies and series, which also stamp `addedToWatchlistDate` — mirroring
-/// `PlayerFavorites` and the detail screens.
-enum LiveChannelFavorites {
-    @discardableResult
-    static func toggle(_ stream: LiveStream, in context: ModelContext) -> Bool {
-        stream.isFavorite.toggle()
-        try? context.save()
-        return stream.isFavorite
     }
 }

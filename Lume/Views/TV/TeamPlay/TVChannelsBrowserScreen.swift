@@ -6,6 +6,10 @@
 //  programme preview. Selection and scroll position are restored via
 //  initialRailID / initialChannelID when returning from the guide or player.
 //
+//  Category ↑/↓ only mutates `rail`. Channel lists and counters come from a
+//  one-shot SwiftData index; EPG for the visible list is debounced so rapid
+//  focus moves never re-filter the catalog or hit the store on every tick.
+//
 
 #if os(tvOS)
 
@@ -83,9 +87,23 @@
         @State private var nowByEpg: [String: EPGListing] = [:]
         @State private var nextByEpg: [String: EPGListing] = [:]
         @State private var categoryCounts: [String: Int] = [:]
+        @State private var categoryItems: [TVChannelRailItem] = []
         @State private var searchText = ""
-        @State private var loadTask: Task<Void, Never>?
         @State private var didRestore = false
+
+        /// Pre-built playlist catalog. Rebuilt on appear / favorites / sort — never
+        /// on a category focus move.
+        @State private var indexedAll: [LiveStream] = []
+        @State private var indexedByCategory: [String: [LiveStream]] = [:]
+        @State private var indexedFavorites: [LiveStream] = []
+        @State private var indexedRecentChannels: [LiveStream] = []
+        @State private var indexedRecentPrograms: [LiveStream] = []
+
+        @State private var indexTask: Task<Void, Never>?
+        @State private var channelsTask: Task<Void, Never>?
+        @State private var epgTask: Task<Void, Never>?
+        @State private var selectionTask: Task<Void, Never>?
+        @State private var postPlaybackRefreshTask: Task<Void, Never>?
 
         @FocusState private var focus: FocusTarget?
 
@@ -107,18 +125,10 @@
             ContentSortOption(rawValue: contentSortRaw) ?? .playlist
         }
 
-        private var playlistPrefix: String { playlist.id.uuidString }
+        private var playlistPrefix: String { LiveChannelFavorites.playlistPrefix(for: playlist.id) }
 
         private var virtualItems: [TVChannelRailItem] {
             [.search, .all, .favorites, .recentChannels, .recentPrograms]
-        }
-
-        private var categoryItems: [TVChannelRailItem] {
-            virtualItems + categorySort.sort(
-                categories.filter {
-                    $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.id)
-                }
-            ).map { .category($0.id, $0.name) }
         }
 
         private var focusedChannel: LiveStream? {
@@ -156,29 +166,64 @@
             .onExitCommand(perform: onBack)
             .onAppear {
                 if !didRestore {
+                    rebuildCategoryItems()
                     if let match = categoryItems.first(where: { $0.id == initialRailID }) {
                         rail = match
                     }
                     focusedChannelID = initialChannelID
                     didRestore = true
                 }
-                reloadChannels()
-                refreshCategoryCounts()
+                _ = LiveChannelFavorites.migrateLegacyFavoritesIfNeeded(
+                    in: modelContext, playlistID: playlist.id
+                )
+                rebuildIndex()
                 Task { @MainActor in
                     focus = .category(rail.id)
                 }
             }
-            .onChange(of: rail) { _, _ in
-                reloadChannels()
-                onSelectionChange(rail.id, focusedChannelID)
+            .onReceive(NotificationCenter.default.publisher(for: LiveChannelFavorites.didChangeNotification)) { _ in
+                rebuildIndex()
             }
-            .onChange(of: focusedChannelID) { _, id in
-                onSelectionChange(rail.id, id)
+            .onReceive(NotificationCenter.default.publisher(for: .teamPlayPlaybackDidDismiss)) { _ in
+                // Delay past player teardown / progress merge so category ↑/↓
+                // stays on the warm in-memory index first.
+                postPlaybackRefreshTask?.cancel()
+                postPlaybackRefreshTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    guard !Task.isCancelled else { return }
+                    rebuildIndex()
+                }
+            }
+            .onChange(of: categorySortRaw) { _, _ in
+                rebuildCategoryItems()
+                rebuildIndex()
+            }
+            .onChange(of: contentSortRaw) { _, _ in
+                rebuildIndex()
+            }
+            .onChange(of: categories.count) { _, _ in
+                rebuildCategoryItems()
+                rebuildIndex()
+            }
+            .onChange(of: rail) { _, newRail in
+                // Defer list swap out of the focus engine's animated context
+                // (tvOS stalls if layout mutates synchronously on focus move).
+                scheduleChannelsApply(for: newRail)
+                scheduleSelectionPersist()
+            }
+            .onChange(of: focusedChannelID) { _, _ in
+                scheduleSelectionPersist()
             }
             .onChange(of: searchText) { _, _ in
-                if case .search = rail { reloadChannels() }
+                if case .search = rail { scheduleChannelsApply(for: rail) }
             }
-            .onDisappear { loadTask?.cancel() }
+            .onDisappear {
+                indexTask?.cancel()
+                channelsTask?.cancel()
+                epgTask?.cancel()
+                selectionTask?.cancel()
+                postPlaybackRefreshTask?.cancel()
+            }
         }
 
         // MARK: - 1. Icon rail
@@ -205,7 +250,8 @@
             .focusSection()
             .onChange(of: focus) { _, target in
                 if case let .icon(id) = target,
-                   let item = virtualItems.first(where: { $0.id == id })
+                   let item = virtualItems.first(where: { $0.id == id }),
+                   rail.id != item.id
                 {
                     rail = item
                 }
@@ -256,8 +302,10 @@
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28))
             .focusSection()
             .onChange(of: focus) { _, target in
+                // Focus move updates selection only — no fetch / filter / EPG.
                 if case let .category(id) = target,
-                   let item = categoryItems.first(where: { $0.id == id })
+                   let item = categoryItems.first(where: { $0.id == id }),
+                   rail.id != item.id
                 {
                     rail = item
                 }
@@ -313,8 +361,8 @@
                         .padding(.horizontal, 12)
                         .padding(.bottom, 20)
                     }
-                    .onChange(of: channels.map(\.id)) { _, _ in
-                        if let id = focusedChannelID {
+                    .onChange(of: focusedChannelID) { _, id in
+                        if let id {
                             proxy.scrollTo(id, anchor: .center)
                         }
                     }
@@ -498,6 +546,7 @@
 
                         Button {
                             _ = LiveChannelFavorites.toggle(channel, in: modelContext)
+                            // Index rebuild arrives via didChangeNotification.
                         } label: {
                             Label(
                                 channel.isFavorite ? "In Favorites" : "Add to Favorites",
@@ -539,75 +588,152 @@
             }
         }
 
-        // MARK: - Data
+        // MARK: - Index / selection
 
-        private func reloadChannels() {
-            loadTask?.cancel()
-            loadTask = Task { @MainActor in
-                let loaded = fetchChannels(for: rail)
-                channels = loaded
-                if focusedChannelID == nil || !loaded.contains(where: { $0.id == focusedChannelID }) {
-                    focusedChannelID = loaded.first?.id
+        private func rebuildCategoryItems() {
+            categoryItems = virtualItems + categorySort.sort(
+                categories.filter {
+                    $0.id.hasPrefix(playlistPrefix) && !restriction.hides(categoryID: $0.id)
                 }
+            ).map { .category($0.id, $0.name) }
+        }
+
+        /// One SwiftData pass for the whole playlist, then in-memory buckets.
+        private func rebuildIndex() {
+            indexTask?.cancel()
+            indexTask = Task { @MainActor in
+                if categoryItems.isEmpty { rebuildCategoryItems() }
+
+                let prefix = playlistPrefix
+                let sort = contentSort
+                var descriptor = FetchDescriptor<LiveStream>(
+                    predicate: #Predicate { $0.isHidden == false && $0.id.starts(with: prefix) },
+                    sortBy: sort.liveStreamDescriptors
+                )
+                descriptor.fetchLimit = 8_000
+                let all = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
+                guard !Task.isCancelled else { return }
+
+                var byCategory: [String: [LiveStream]] = [:]
+                var favorites: [LiveStream] = []
+                for stream in all {
+                    if let categoryId = stream.categoryId {
+                        byCategory[categoryId, default: []].append(stream)
+                    }
+                    if stream.isFavorite {
+                        favorites.append(stream)
+                    }
+                }
+                favorites.sort { lhs, rhs in
+                    switch (lhs.favoriteOrder, rhs.favoriteOrder) {
+                    case let (l?, r?):
+                        if l != r { return l < r }
+                    case (_?, nil):
+                        return true
+                    case (nil, _?):
+                        return false
+                    case (nil, nil):
+                        break
+                    }
+                    if lhs.num != rhs.num { return lhs.num < rhs.num }
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+
+                let recentChannels = fetchScoped(.recentlyWatched)
+                let recentPrograms: [LiveStream] = {
+                    let recent = TVArchiveResumeStore.recentEntries()
+                    let ids = recent.map(\.entry.streamID)
+                    guard !ids.isEmpty else { return [] }
+                    let byId = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+                    return ids.compactMap { byId[$0] }
+                }()
+
+                guard !Task.isCancelled else { return }
+
+                indexedAll = all
+                indexedByCategory = byCategory
+                indexedFavorites = favorites
+                indexedRecentChannels = recentChannels
+                indexedRecentPrograms = recentPrograms
+
+                var counts: [String: Int] = [:]
+                counts[TVChannelRailItem.search.id] = min(all.count, 80)
+                counts[TVChannelRailItem.all.id] = all.count
+                counts[TVChannelRailItem.favorites.id] = favorites.count
+                counts[TVChannelRailItem.recentChannels.id] = recentChannels.count
+                counts[TVChannelRailItem.recentPrograms.id] = recentPrograms.count
+                for item in categoryItems {
+                    if case let .category(id, _) = item {
+                        counts[item.id] = byCategory[id]?.count ?? 0
+                    }
+                }
+                categoryCounts = counts
+
+                applyChannelsFromIndex(for: rail, debounceEPG: false)
+            }
+        }
+
+        private func scheduleChannelsApply(for item: TVChannelRailItem) {
+            channelsTask?.cancel()
+            channelsTask = Task { @MainActor in
+                // Yield so the focus ring paints before the channels column swaps.
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                applyChannelsFromIndex(for: item, debounceEPG: true)
+            }
+        }
+
+        private func applyChannelsFromIndex(for item: TVChannelRailItem, debounceEPG: Bool) {
+            let loaded = channelsFromIndex(for: item)
+            channels = loaded
+            if focusedChannelID == nil || !loaded.contains(where: { $0.id == focusedChannelID }) {
+                focusedChannelID = loaded.first?.id
+            }
+            if debounceEPG {
+                scheduleEPGRefresh(for: loaded)
+            } else {
+                epgTask?.cancel()
                 refreshNowAndNext(for: loaded)
             }
         }
 
-        private func refreshCategoryCounts() {
-            Task { @MainActor in
-                var counts: [String: Int] = [:]
-                for item in categoryItems {
-                    counts[item.id] = fetchChannels(for: item).count
-                }
-                categoryCounts = counts
-            }
-        }
-
-        private func fetchChannels(for item: TVChannelRailItem) -> [LiveStream] {
-            let prefix = playlistPrefix
-            let sort = contentSort
+        private func channelsFromIndex(for item: TVChannelRailItem) -> [LiveStream] {
             switch item {
             case .search:
                 let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-                var descriptor = FetchDescriptor<LiveStream>(
-                    predicate: #Predicate { $0.isHidden == false && $0.id.starts(with: prefix) },
-                    sortBy: sort.liveStreamDescriptors
-                )
-                descriptor.fetchLimit = 400
-                let all = ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
-                guard !needle.isEmpty else { return Array(all.prefix(80)) }
-                return all.filter { $0.name.localizedCaseInsensitiveContains(needle) }
-
+                guard !needle.isEmpty else { return Array(indexedAll.prefix(80)) }
+                return indexedAll.filter { $0.name.localizedCaseInsensitiveContains(needle) }
             case .all:
-                var descriptor = FetchDescriptor<LiveStream>(
-                    predicate: #Predicate { $0.isHidden == false && $0.id.starts(with: prefix) },
-                    sortBy: sort.liveStreamDescriptors
-                )
-                descriptor.fetchLimit = 500
-                return ((try? modelContext.fetch(descriptor)) ?? []).excludingRestricted(restriction)
-
+                return Array(indexedAll.prefix(500))
             case .favorites:
-                return fetchScoped(.favorites)
-
+                return indexedFavorites
             case .recentChannels:
-                return fetchScoped(.recentlyWatched)
-
+                return indexedRecentChannels
             case .recentPrograms:
-                let recent = TVArchiveResumeStore.recentEntries()
-                let ids = recent.map(\.entry.streamID)
-                guard !ids.isEmpty else { return [] }
-                let descriptor = FetchDescriptor<LiveStream>(
-                    predicate: #Predicate { ids.contains($0.id) && $0.isHidden == false }
-                )
-                let byId = Dictionary(
-                    uniqueKeysWithValues: ((try? modelContext.fetch(descriptor)) ?? [])
-                        .excludingRestricted(restriction)
-                        .map { ($0.id, $0) }
-                )
-                return ids.compactMap { byId[$0] }
-
+                return indexedRecentPrograms
             case let .category(id, _):
-                return fetchScoped(.category(id))
+                return indexedByCategory[id] ?? []
+            }
+        }
+
+        private func scheduleEPGRefresh(for channels: [LiveStream]) {
+            epgTask?.cancel()
+            let snapshot = channels
+            epgTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                guard !Task.isCancelled else { return }
+                refreshNowAndNext(for: snapshot)
+            }
+        }
+
+        private func scheduleSelectionPersist() {
+            selectionTask?.cancel()
+            let railID = rail.id
+            let channelID = focusedChannelID
+            selectionTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                guard !Task.isCancelled else { return }
+                onSelectionChange(railID, channelID)
             }
         }
 

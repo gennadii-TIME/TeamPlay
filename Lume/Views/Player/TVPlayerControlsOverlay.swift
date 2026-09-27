@@ -172,9 +172,8 @@
                     timedMute.checkDeadlineOnForeground(apply: applyEngineMute)
                 }
             }
-            .onChange(of: focus) {
-                onResetHideTimer()
-            }
+            // Focus / clock ticks must not restart the OSD hide deadline —
+            // only explicit remote actions call `onResetHideTimer`.
             .onChange(of: clock.current) {
                 autoReturnToLiveIfNeeded()
             }
@@ -333,7 +332,7 @@
             }
         }
 
-        /// Fixed-height programme block: title / times / optional description.
+        /// Fixed-height programme block: title / times.
         /// Text changes never resize the card; long titles truncate to one line.
         private var compactProgramHeader: some View {
             let program = compactDisplayedProgram
@@ -347,7 +346,6 @@
                 }
                 return LiveTimeshift.wallClockString(displayedAbsoluteDate)
             }()
-            let description = program?.listingDescription.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
             return VStack(alignment: .leading, spacing: 4) {
                 Text(titleText)
@@ -365,16 +363,8 @@
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 24, alignment: .leading)
-
-                Text(description.isEmpty ? " " : description)
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(.white.opacity(description.isEmpty ? 0 : 0.65))
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 22, alignment: .leading)
-                    .accessibilityHidden(description.isEmpty)
             }
-            .frame(height: 88, alignment: .top)
+            .frame(height: 66, alignment: .top)
         }
 
         private var compactChannelIdentity: some View {

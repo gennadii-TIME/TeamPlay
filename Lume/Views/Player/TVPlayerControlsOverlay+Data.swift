@@ -930,14 +930,18 @@
         /// `@Observable` model so toggling re-renders the glyph.
         var isFavorite: Bool {
             if isSeries { return episode?.series?.isFavorite ?? false }
-            if media.isLive { return liveStream?.isFavorite ?? false }
+            // Live / catchup / timeshift all carry `.live` contentRef — gate on
+            // the resolved stream, not `media.isLive` (archive sessions are VOD).
+            if liveStream != nil, case .live = media.contentRef {
+                return liveStream?.isFavorite ?? false
+            }
             return movie?.isFavorite ?? false
         }
 
         func toggleFavorite() {
             if isSeries, let series = episode?.series {
                 MediaFavorites.toggle(series, in: modelContext)
-            } else if media.isLive, let liveStream {
+            } else if let liveStream, case .live = media.contentRef {
                 LiveChannelFavorites.toggle(liveStream, in: modelContext)
             } else if let movie {
                 MediaFavorites.toggle(movie, in: modelContext)

@@ -226,7 +226,9 @@ struct AVPlayerEngineView: View {
             #endif
         }
         .onChange(of: coordinator.isPlaying) { _, _ in
-            resetHideTimer()
+            #if !os(tvOS)
+                resetHideTimer()
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
             // The Home button backgrounds the app without calling onDisappear,
@@ -486,6 +488,7 @@ struct AVPlayerEngineView: View {
     /// second Menu press, with the controls hidden, dismisses the player.
     private func hideControls() {
         hideTask?.cancel()
+        isPanelOpen = false
         withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
         #if os(tvOS)
             controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
@@ -556,15 +559,35 @@ struct AVPlayerEngineView: View {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard coordinator.isPlaying, !isPanelOpen, !PlayerControlsAutoHide.isSuppressed else { return }
-        hideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
-            guard !Task.isCancelled, coordinator.isPlaying else { return }
-            withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
-            #if os(tvOS)
+        #if os(tvOS)
+            guard !TVOSDAutoHidePolicy.isHideBlocked(
+                isControlsVisible: isControlsVisible,
+                isPanelOpen: isPanelOpen,
+                isScrubbing: controlSession.isScrubbing,
+                isSeekInFlight: controlSession.isSeekInFlight
+            ), !PlayerControlsAutoHide.isSuppressed else { return }
+            let delay = autoHideInterval
+            hideTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                guard !TVOSDAutoHidePolicy.isHideBlocked(
+                    isControlsVisible: isControlsVisible,
+                    isPanelOpen: isPanelOpen,
+                    isScrubbing: controlSession.isScrubbing,
+                    isSeekInFlight: controlSession.isSeekInFlight
+                ) else { return }
+                isPanelOpen = false
+                withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
                 controlSession.noteControlsClosed(mediaIsCatchup: media.isCatchup)
-            #endif
-        }
+            }
+        #else
+            guard coordinator.isPlaying, !isPanelOpen, !PlayerControlsAutoHide.isSuppressed else { return }
+            hideTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(autoHideInterval * 1_000_000_000))
+                guard !Task.isCancelled, coordinator.isPlaying else { return }
+                withAnimation(.easeInOut(duration: 0.2)) { isControlsVisible = false }
+            }
+        #endif
     }
 
     private func closePlayer() {
