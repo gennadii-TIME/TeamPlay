@@ -8,9 +8,10 @@
 //  same-module extension can read it.
 //
 
+import Foundation
+
 #if os(tvOS)
 
-    import Foundation
     import OSLog
     import SwiftData
     import SwiftUI
@@ -492,45 +493,19 @@
                 return
             }
 
-            // Already on a timeshift clip whose manifest covers the target →
-            // in-engine seek (no media reload). Gate on clip bounds + seekable
-            // range — never `clock.duration > 1` alone.
-            if let start = media.archiveWindowStart,
-               media.isCatchup
-            {
-                let end = media.archiveWindowEnd
-                    ?? start.addingTimeInterval(max(clock.duration, LiveTimeshift.minimumClipDuration))
-                let seekableEnd = clock.duration > 0
-                    ? clock.duration
-                    : max(0, end.timeIntervalSince(start))
-                if let seekTo = LiveTimeshift.inClipSeekOffset(
-                    target: clamped,
-                    clipStart: start,
-                    clipEnd: end,
-                    seekableStart: 0,
-                    seekableEnd: seekableEnd
-                ) {
-                    guard controlSession.isSeekGenerationCurrent(generation) else { return }
-                    coordinator.seek(to: seekTo)
-                    clock.current = seekTo
-                    LiveTimeshiftDiagnostics.logRequest(
-                        channelName: stream.name,
-                        zoneID: TimeZone.autoupdatingCurrent.identifier,
-                        programStartLocal: epgNow.map { LiveTimeshift.wallClockString($0.start) },
-                        programStartAbsolute: epgNow?.start,
-                        requestedAbsolute: clamped,
-                        flussonicUTC: Int(start.timeIntervalSince1970),
-                        playerTime: seekTo
-                    )
-                    controlSession.finishSeek(mediaIsCatchup: true, keepControls: true)
-                    if resumeAfter, !coordinator.isPlaying { onTogglePlay() }
-                    Task { @MainActor in focus = .transport }
-                    onResetHideTimer()
-                    return
-                }
-            }
-
+            // Absolute catchup / timeshift scrub always rebuilds the archive URL.
+            // Deep archive HLS often reports a finite duration yet ignores
+            // in-engine seeks (picture keeps playing at the old offset with no
+            // error). Policy forbids silent no-op on this path.
             let clipEnd = max(clamped.addingTimeInterval(LiveTimeshift.minimumClipDuration), now)
+            _ = DeepArchiveSeekPolicy.decide(
+                target: clamped,
+                clipStart: media.archiveWindowStart ?? clamped,
+                clipEnd: media.archiveWindowEnd ?? clipEnd,
+                duration: clock.duration,
+                seekableStart: clock.duration > 1 ? 0 : nil,
+                seekableEnd: clock.duration > 1 ? clock.duration : nil
+            )
             await launchTimeshift(
                 stream: stream,
                 playlist: playlist,
@@ -591,12 +566,29 @@
                 return
             }
 
+            // Same URL + same archive window → switchMedia would no-op. Never
+            // leave the viewer on the old playhead without feedback.
+            if newMedia.playbackSourceFingerprint == media.playbackSourceFingerprint {
+                archiveBanner = String(localized: "Archive unavailable for this time")
+                LiveTimeshiftDiagnostics.noteURLRebuild(
+                    reason: "same-fingerprint-noop",
+                    startUTC: Int(start.timeIntervalSince1970)
+                )
+                controlSession.failSeek(mediaIsCatchup: true, keepControls: true)
+                Task { @MainActor in focus = .transport }
+                return
+            }
+
+            guard controlSession.isSeekGenerationCurrent(generation) else { return }
+
             // Start playback immediately — do not await probe/PDT on the critical path.
             // Background probe only surfaces a banner if the URL later proves dead;
-            // never silent-fallback to live.
+            // never silent-fallback to live. finishSeek must not run before
+            // onSelectMedia so generation stays current through the swap.
             controlSession.noteMediaReload(reason: "launchTimeshift")
-            controlSession.finishSeek(mediaIsCatchup: true, keepControls: true)
             onSelectMedia(newMedia)
+            controlSession.finishSeek(mediaIsCatchup: true, keepControls: true)
+            if resumeAfter, !coordinator.isPlaying { onTogglePlay() }
             Task { @MainActor in focus = .transport }
             onResetHideTimer()
 
@@ -964,3 +956,38 @@
     }
 
 #endif
+
+// MARK: - Deep archive seek policy
+
+/// Outcome of absolute seek while already on a catch-up / timeshift clip.
+enum DeepArchiveSeekDecision: Equatable {
+    /// Offset seconds for `coordinator.seek(to:)`.
+    case engineSeek(TimeInterval)
+    /// Rebuild archive media via `launchTimeshift` (exactly once per commit).
+    case launchTimeshift
+}
+
+/// Decides in-engine seek vs timeshift URL rebuild for absolute catchup scrub.
+///
+/// Always `.launchTimeshift`: deep archive frequently reports a finite
+/// `duration` while in-engine seek is a silent no-op. Absolute scrub must
+/// rebuild the archive URL (or surface a visible failure) — never leave the
+/// old playhead running without feedback.
+enum DeepArchiveSeekPolicy {
+    static func decide(
+        target: Date,
+        clipStart: Date,
+        clipEnd: Date,
+        duration: TimeInterval,
+        seekableStart: TimeInterval?,
+        seekableEnd: TimeInterval?
+    ) -> DeepArchiveSeekDecision {
+        _ = target
+        _ = clipStart
+        _ = clipEnd
+        _ = duration
+        _ = seekableStart
+        _ = seekableEnd
+        return .launchTimeshift
+    }
+}
