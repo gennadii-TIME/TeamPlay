@@ -1,0 +1,168 @@
+//
+//  TVPlayerContent.swift
+//  Lume
+//
+//  SwiftData lookups that back the tvOS in-player overlay. Given the value-type
+//  `PlayableMedia` the player knows about, these resolve the underlying model
+//  objects (episode + sibling episodes, movie, live stream + EPG) so the
+//  overlay can render the episode rail, the information panel and the EPG
+//  caption, and build a `PlayableMedia` for a newly-picked episode.
+//
+
+#if os(tvOS)
+
+    import Foundation
+    import SwiftData
+
+    enum TVPlayerContent {
+        // MARK: - Model lookups
+
+        static func episode(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> Episode? {
+            guard case let .episode(id) = ref else { return nil }
+            var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            return try? context.fetch(descriptor).first
+        }
+
+        static func movie(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> Movie? {
+            guard case let .movie(id) = ref else { return nil }
+            var descriptor = FetchDescriptor<Movie>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            return try? context.fetch(descriptor).first
+        }
+
+        static func liveStream(for ref: PlayableMedia.ContentRef, in context: ModelContext) -> LiveStream? {
+            guard case let .live(id) = ref else { return nil }
+            var descriptor = FetchDescriptor<LiveStream>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            return try? context.fetch(descriptor).first
+        }
+
+        // MARK: - Episodes
+
+        /// Episodes of the given episode's season, ordered by episode number —
+        /// the content of the in-player episode rail.
+        static func seasonEpisodes(for episode: Episode) -> [Episode] {
+            guard let series = episode.series else { return [episode] }
+            return series.episodes
+                .filter { $0.seasonNum == episode.seasonNum }
+                .sorted { $0.episodeNum < $1.episodeNum }
+        }
+
+        /// The playlist that owns a series, mirroring the detail screen's logic
+        /// (prefix match on the playlist UUID, falling back to the first one).
+        static func playlist(for series: Series?, in context: ModelContext) -> Playlist? {
+            let playlists = (try? context.fetch(FetchDescriptor<Playlist>())) ?? []
+            guard let series else { return playlists.first }
+            return playlists.first { series.id.hasPrefix($0.id.uuidString) } ?? playlists.first
+        }
+
+        // MARK: - Recent channels
+
+        /// The recently-watched live channels, current channel first, resolved
+        /// into models for the in-player "Recent" rail. Order follows
+        /// `LiveChannelHistory`; channels that no longer resolve (e.g. removed in
+        /// a sync) are simply dropped.
+        ///
+        /// `restriction` is required, like `LiveChannelQuery.scoped`'s: this rail
+        /// is a channel list the viewer can tune from, and history cuts across
+        /// categories, so a channel watched *before* its category was locked
+        /// would otherwise stay one tab away for a child mid-playback. Hidden
+        /// channels drop out for the same reason every other channel query
+        /// filters them.
+        static func recentChannels(
+            in context: ModelContext,
+            restriction: ContentRestriction,
+            defaults: UserDefaults = .standard
+        ) -> [LiveStream] {
+            let ids = LiveChannelHistory.recentChannelIds(defaults: defaults)
+            guard !ids.isEmpty else { return [] }
+            let descriptor = FetchDescriptor<LiveStream>(
+                predicate: #Predicate { ids.contains($0.id) && $0.isHidden == false }
+            )
+            let visible = ((try? context.fetch(descriptor)) ?? []).excludingRestricted(restriction)
+            let byId = Dictionary(visible.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            return ids.compactMap { byId[$0] }
+        }
+
+        /// The titles of the programmes airing right now on the given channels,
+        /// keyed by EPG channel id — a single fetch that backs the subtitle line
+        /// on each card in the "Recent" rail.
+        static func nowProgrammeTitles(for channels: [LiveStream], in context: ModelContext) -> [String: String] {
+            let epgIds = Set(channels.compactMap(\.epgChannelId).filter { !$0.isEmpty })
+            guard !epgIds.isEmpty else { return [:] }
+            let now = Date()
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { epgIds.contains($0.channelId) && $0.start <= now && now < $0.end }
+            )
+            let listings = (try? context.fetch(descriptor)) ?? []
+            return Dictionary(listings.map { ($0.channelId, $0.title) }, uniquingKeysWith: { first, _ in first })
+        }
+
+        // MARK: - EPG
+
+        /// How many rows `epgListings` returns. Its one caller
+        /// (`TVPlayerControlsOverlay.resolveContent`) reads exactly two values
+        /// out of the result — the programme airing now and the one after it —
+        /// and, ordered by start, those are the first two rows. Unbounded, the
+        /// fetch handed it the channel's whole remaining guide instead: 615 rows
+        /// on the measured store, 1,209 on the busiest channel, hydrated on
+        /// every controls wake and every channel surf while the stream decodes.
+        /// The slack above two absorbs the overlapping and duplicated entries
+        /// providers ship, which would otherwise push "next" out of the window.
+        private static let nowNextLimit = 6
+
+        /// Upcoming/ongoing EPG listings for a channel, soonest first, bounded
+        /// to the now/next window the caller reads (`nowNextLimit`). The
+        /// `channelId + end` index seeks straight to the remaining guide.
+        static func epgListings(channelId: String?, in context: ModelContext) -> [EPGListing] {
+            guard let channelId, !channelId.isEmpty else { return [] }
+            let now = Date()
+            var descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { $0.channelId == channelId && $0.end > now },
+                sortBy: [SortDescriptor(\.start)]
+            )
+            descriptor.fetchLimit = nowNextLimit
+            return (try? context.fetch(descriptor)) ?? []
+        }
+
+        /// EPG listings for the in-player guide, oldest first. With
+        /// `archiveDays > 0` (a catch-up channel) it reaches back that many days
+        /// so already-aired programmes are available to replay; otherwise it
+        /// returns only what's airing now and later. The `channelId + end` index
+        /// keeps this to a small slice of the guide table.
+        static func guideListings(channelId: String?, archiveDays: Int, in context: ModelContext) -> [EPGListing] {
+            guard let channelId, !channelId.isEmpty else { return [] }
+            let now = Date()
+            let earliest = archiveDays > 0
+                ? Calendar.current.date(byAdding: .day, value: -archiveDays, to: now) ?? now
+                : now
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate { $0.channelId == channelId && $0.end > earliest },
+                sortBy: [SortDescriptor(\.start)]
+            )
+            return (try? context.fetch(descriptor)) ?? []
+        }
+
+        /// Local guide slice covering `[from, to]` for scrub-preview programme
+        /// lookup. Sorted by start; callers must not hit the network per nudge.
+        static func epgListings(
+            channelId: String?,
+            coveringFrom from: Date,
+            to: Date,
+            in context: ModelContext
+        ) -> [EPGListing] {
+            guard let channelId, !channelId.isEmpty else { return [] }
+            let windowStart = min(from, to)
+            let windowEnd = max(from, to)
+            let descriptor = FetchDescriptor<EPGListing>(
+                predicate: #Predicate {
+                    $0.channelId == channelId && $0.end > windowStart && $0.start < windowEnd
+                },
+                sortBy: [SortDescriptor(\.start)]
+            )
+            return (try? context.fetch(descriptor)) ?? []
+        }
+    }
+
+#endif

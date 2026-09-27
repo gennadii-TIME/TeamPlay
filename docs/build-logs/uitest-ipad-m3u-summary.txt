@@ -1,0 +1,62 @@
+} (error = Error Domain=FBSOpenApplicationServiceErrorDomain Code=1 "Simulator device failed to launch time.teamplay.uitests.xctrunner." UserInfo={NSLocalizedDescription=Simulator device failed to launch time.teamplay.uitests.xctrunner., NSUnderlyingError=0xa265f80f0 {Error Domain=FBSOpenApplicationServiceErrorDomain Code=1 "The request to open "time.teamplay.uitests.xctrunner" failed." UserInfo={BSErrorCodeDescription=RequestDenied, NSLocalizedDescription=The request to open "time.teamplay.uitests.xctrunner" failed., NSUnderlyingError=0xa265f8ab0 {Error Domain=FBProcessExit Code=64 "The process failed to launch." UserInfo={NSUnderlyingError=0xa265f8db0 {Error Domain=RBSRequestErrorDomain Code=5 "Launch failed." UserInfo=0xa265d3b80 (not displayed)}, BSErrorCodeDescription=launch-failed, NSLocalizedFailureReason=The process failed to launch.}}, FBSOpenApplicationRequestID=0xc30d, NSLocalizedFailureReason=The request was denied by service delegate (SBMainWorkspace).}}, NSLocalizedFailureReason=The request was denied by service delegate (SBMainWorkspace)., FBSOpenApplicationRequestID=0xc30d, SimCallingSelector=launchApplicationWithID:options:pid:error:, BSErrorCodeDescription=RequestDenied})
+--- tail ---
+    cd /Users/gennadiistepanov/TeamPlay
+    /usr/bin/touch -c /tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator/LumeUITests-Runner.app/PlugIns/LumeUITests.xctest
+
+PruneExplicitPrecompiledModules /tmp/teamplay-dd-uitest-ipad/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+PruneExplicitPrecompiledModules /tmp/teamplay-dd-uitest-ipad/Build/Intermediates.noindex/ExplicitPrecompiledModules
+
+PruneExplicitPrecompiledModules /tmp/teamplay-dd-uitest-ipad/SDKExplicitPrecompiledModules
+
+note: Disabling hardened runtime with ad-hoc codesigning. (in target 'Lume' from project 'Lume')
+note: Run script build phase 'Fix Embedded Framework CFBundleIdentifier' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Lume' from project 'Lume')
+note: Run script build phase 'Inject .env secrets' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Lume' from project 'Lume')
+2026-09-25 22:53:42.118 xcodebuild[97977:7230472] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-09-25 22:53:42.118 xcodebuild[97977:7230472] [MT] IDELaunchParametersSnapshot: no debugger version
+2026-09-25 22:54:17.316 xcodebuild[97977:7243330]  iOSSimulator: 69DE5F23-B2B6-41D6-9581-EBA01C62F856: Failed to launch app with identifier: time.teamplay.uitests.xctrunner and options: {
+    "activate_suspended" = 1;
+    arguments =     (
+    );
+    environment =     {
+        "APP_DISTRIBUTOR_ID_OVERRIDE" = "com.apple.AppStore";
+        "CA_ASSERT_MAIN_THREAD_TRANSACTIONS" = 0;
+        "CA_DEBUG_TRANSACTIONS" = 0;
+        "DYLD_FRAMEWORK_PATH" = "/tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator:/tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator/PackageFrameworks:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks";
+        "DYLD_INSERT_LIBRARIES" = "/usr/lib/libRPAC.dylib:/Library/Developer/CoreSimulator/Volumes/iOS_23F77/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.5.simruntime/Contents/Resources/RuntimeRoot/usr/lib/libMainThreadChecker.dylib";
+        "DYLD_LIBRARY_PATH" = "/tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib";
+        "IDE_CHOSEN_LOGGING_METHOD" = 1;
+        "LLVM_PROFILE_FILE" = "/var/folders/xl/15pgt7h531lclpjblx7m5v6c0000gn/T/time.teamplay.uitests.xctrunner/EF980ADB-7E6D-4C3E-BC76-A8B2DA1CCA21-97977-00000B796F4DA51D/3044557B-116E-4C2A-8D24-690F5328A752-%p%c.profraw";
+        NSApplicationQuitWithoutSuddenTermination = YES;
+        NSUnbufferedIO = YES;
+        "OS_ACTIVITY_DT_MODE" = YES;
+        "PERFC_ENABLE_EXTENDED_DIAGNOSTIC_FORMAT" = 1;
+        "PERFC_ENABLE_PROFILE_MODE" = 1;
+        "PERFC_RESET_INSERT_LIBRARIES" = 1;
+        "PERFC_SUPPRESS_SYSTEM_REPORTS" = 1;
+        "RUN_DESTINATION_DEVICE_NAME" = "Clone 2 of iPad Pro 13-inch (M5)";
+        "RUN_DESTINATION_DEVICE_PLATFORM_IDENTIFIER" = "com.apple.platform.iphonesimulator";
+        "RUN_DESTINATION_DEVICE_UDID" = "69DE5F23-B2B6-41D6-9581-EBA01C62F856";
+        "SQLITE_ENABLE_THREAD_ASSERTIONS" = 1;
+        "SWIFT_BACKTRACE" = "enable=no";
+        TERM = dumb;
+        "XCODE_SCHEME_NAME" = Lume;
+        "XCODE_TEST_PLAN_NAME" = Lume;
+        XCTestBundleInjectPath = "/usr/lib/libRPAC.dylib:/Library/Developer/CoreSimulator/Volumes/iOS_23F77/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.5.simruntime/Contents/Resources/RuntimeRoot/usr/lib/libMainThreadChecker.dylib";
+        XCTestBundlePath = "PlugIns/LumeUITests.xctest";
+        XCTestConfigurationFilePath = "";
+        XCTestSessionIdentifier = "D805E992-839A-4C81-9978-807A8BB079E5";
+        "__XCODE_BUILT_PRODUCTS_DIR_PATHS" = "/tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator";
+        "__XPC_DYLD_FRAMEWORK_PATH" = "/tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator";
+        "__XPC_DYLD_LIBRARY_PATH" = "/tmp/teamplay-dd-uitest-ipad/Build/Products/Debug-iphonesimulator";
+        "__XPC_LLVM_PROFILE_FILE" = "/var/folders/xl/15pgt7h531lclpjblx7m5v6c0000gn/T/time.teamplay.uitests.xctrunner/EF980ADB-7E6D-4C3E-BC76-A8B2DA1CCA21-97977-00000B796F4DA51D/3044557B-116E-4C2A-8D24-690F5328A752-%p%c.profraw";
+    };
+    stderr = "/dev/ttys003";
+    stdout = "/dev/ttys003";
+    "terminate_running_process" = 1;
+    "wait_for_debugger" = 1;
+} (error = Error Domain=FBSOpenApplicationServiceErrorDomain Code=1 "Simulator device failed to launch time.teamplay.uitests.xctrunner." UserInfo={NSLocalizedDescription=Simulator device failed to launch time.teamplay.uitests.xctrunner., NSUnderlyingError=0xa265f80f0 {Error Domain=FBSOpenApplicationServiceErrorDomain Code=1 "The request to open "time.teamplay.uitests.xctrunner" failed." UserInfo={BSErrorCodeDescription=RequestDenied, NSLocalizedDescription=The request to open "time.teamplay.uitests.xctrunner" failed., NSUnderlyingError=0xa265f8ab0 {Error Domain=FBProcessExit Code=64 "The process failed to launch." UserInfo={NSUnderlyingError=0xa265f8db0 {Error Domain=RBSRequestErrorDomain Code=5 "Launch failed." UserInfo=0xa265d3b80 (not displayed)}, BSErrorCodeDescription=launch-failed, NSLocalizedFailureReason=The process failed to launch.}}, FBSOpenApplicationRequestID=0xc30d, NSLocalizedFailureReason=The request was denied by service delegate (SBMainWorkspace).}}, NSLocalizedFailureReason=The request was denied by service delegate (SBMainWorkspace)., FBSOpenApplicationRequestID=0xc30d, SimCallingSelector=launchApplicationWithID:options:pid:error:, BSErrorCodeDescription=RequestDenied})
+2026-09-25 23:02:04.111 xcodebuild[97977:7230472] [MT] IDETestOperationsObserverDebug: 535.357 elapsed -- Testing started completed.
+2026-09-25 23:02:04.111 xcodebuild[97977:7230472] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-25 23:02:04.111 xcodebuild[97977:7230472] [MT] IDETestOperationsObserverDebug: 535.358 sec, +535.358 sec -- end
+** BUILD INTERRUPTED **
