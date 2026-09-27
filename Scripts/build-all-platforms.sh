@@ -32,10 +32,9 @@ destinations=(
   "${TEAMPLAY_IPHONE_DEST:-platform=iOS Simulator,name=iPhone 17 Pro}"
   "${TEAMPLAY_IPAD_DEST:-platform=iOS Simulator,name=iPad Pro 13-inch (M5)}"
   "${TEAMPLAY_MACOS_DEST:-platform=macOS}"
-  "${TEAMPLAY_VISIONOS_DEST:-platform=visionOS Simulator,name=Apple Vision Pro}"
 )
 
-names=(tvOS iPhone iPad macOS visionOS)
+names=(tvOS iPhone iPad macOS)
 failed=0
 
 for i in "${!destinations[@]}"; do

@@ -28,7 +28,6 @@ Closes #
 - [ ] iOS / iPadOS
 - [ ] macOS
 - [ ] tvOS
-- [ ] visionOS
 
 ## Screenshots / recordings
 
