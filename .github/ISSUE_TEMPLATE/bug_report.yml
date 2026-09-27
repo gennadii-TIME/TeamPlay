@@ -56,7 +56,6 @@ body:
         - iOS / iPadOS
         - macOS
         - tvOS
-        - visionOS
     validations:
       required: true
   - type: dropdown

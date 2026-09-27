@@ -245,8 +245,6 @@ if [ -d "$CHECKOUTS" ]; then
             case "$PLATFORM" in
                 iphoneos)          slice_pattern="ios-arm64" ;;
                 iphonesimulator)   slice_pattern="ios-arm64_x86_64-simulator" ;;
-                xros)              slice_pattern="xros-arm64" ;;
-                xrsimulator)       slice_pattern="xros-arm64-simulator" ;;
                 appletvos)         slice_pattern="tvos-*" ;;
                 appletvsimulator)  slice_pattern="tvos-*-simulator" ;;
                 *)                 slice_pattern="*" ;;
