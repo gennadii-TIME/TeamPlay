@@ -28,21 +28,6 @@
       "productID" : "time.teamplay.premium.lifetime",
       "referenceName" : "TeamPlay Premium Lifetime",
       "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "0.99",
-      "familyShareable" : true,
-      "internalID" : "5003",
-      "localizations" : [
-        {
-          "description" : "Retired. Kept here only so the grandfathered entitlement path stays testable.",
-          "displayName" : "TeamPlay Premium (Retired Monthly)",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "time.teamplay.premium.monthly.retired",
-      "referenceName" : "TeamPlay Premium Retired Monthly",
-      "type" : "NonConsumable"
     }
   ],
   "settings" : {
@@ -95,54 +80,7 @@
     "_timeRate" : 0
   },
   "subscriptionGroups" : [
-    {
-      "id" : "22272764",
-      "localizations" : [
 
-      ],
-      "name" : "TeamPlay Premium",
-      "subscriptions" : [
-        {
-          "adHocOffers" : [
-
-          ],
-          "billingPlans" : [
-            {
-              "billingPlanType" : "BILLED_UPFRONT",
-              "commitmentDisplayPrice" : "0.99",
-              "displayPrice" : "0.99",
-              "internalID" : "43245CE8",
-              "isEnabled" : true
-            }
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "0.99",
-          "familyShareable" : true,
-          "groupNumber" : 1,
-          "internalID" : "5002",
-          "introductoryOffers" : [
-
-          ],
-          "localizations" : [
-            {
-              "description" : "Unlock every TeamPlay Premium feature, billed monthly.",
-              "displayName" : "TeamPlay Premium (Monthly)",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "time.teamplay.premium.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "TeamPlay Premium Monthly Subscription",
-          "subscriptionGroupID" : "22272764",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-
-          ]
-        }
-      ]
-    }
   ],
   "version" : {
     "major" : 5,

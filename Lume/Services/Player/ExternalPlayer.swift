@@ -143,7 +143,21 @@ enum ExternalPlayback {
     /// Opens `media` in the preferred external player. Returns `true` when the
     /// hand-off happened; on `false` the caller starts the built-in player so
     /// playback never dead-ends.
+    ///
+    /// New sessions must be requested via `PlaybackAccessCoordinator` first.
+    /// When access is not yet allowed this returns `true` without opening so an
+    /// ungated caller cannot create a built-in player under the paywall; the
+    /// coordinator already holds (or will hold) the real launch.
     static func open(_ media: PlayableMedia) -> Bool {
+        switch PlaybackAccessPolicy.decision(for: PremiumManager.shared.accessState) {
+        case .allow:
+            return openUnlocked(media)
+        case .waitForAccess, .requirePurchase:
+            return true
+        }
+    }
+
+    private static func openUnlocked(_ media: PlayableMedia) -> Bool {
         guard let player = target(for: media),
               let deepLink = player.deepLink(for: media.url) else { return false }
         #if os(macOS)

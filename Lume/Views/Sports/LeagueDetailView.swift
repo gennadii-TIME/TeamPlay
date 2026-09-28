@@ -328,7 +328,7 @@ struct LeagueDetailView: View {
             if afterSheet {
                 pendingMedia = media
             } else {
-                playingMedia = media
+                PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
             }
         #endif
     }
@@ -337,7 +337,7 @@ struct LeagueDetailView: View {
         #if os(iOS) || os(visionOS)
             guard let media = pendingMedia else { return }
             pendingMedia = nil
-            playingMedia = media
+            PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
         #endif
     }
 }

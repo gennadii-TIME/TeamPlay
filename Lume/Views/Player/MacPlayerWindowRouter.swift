@@ -45,6 +45,13 @@ import SwiftUI
 
         /// Play `media` in the player window, creating it only if there is none.
         func play(_ media: PlayableMedia, using openWindow: OpenWindowAction) {
+            PlaybackAccessCoordinator.shared.requestLaunch {
+                self.playAuthorized(media, using: openWindow)
+            }
+        }
+
+        /// Starts playback after the access gate has already allowed the launch.
+        private func playAuthorized(_ media: PlayableMedia, using openWindow: OpenWindowAction) {
             guard let launchMedia else {
                 openWindow(id: "player", value: media)
                 return

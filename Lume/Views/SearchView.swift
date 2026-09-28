@@ -168,12 +168,14 @@ struct SearchView: View {
         // holds the same id over there.
         guard let playlist = playlists.owner(ofContentID: stream.id) ?? activePlaylist,
               let media = PlayableMedia.from(stream: stream, playlist: playlist) else { return }
-        if ExternalPlayback.open(media) { return }
-        #if os(macOS)
-            MacPlayerWindowRouter.shared.play(media, using: openWindow)
-        #else
-            playingMedia = media
-        #endif
+        PlaybackAccessCoordinator.shared.requestLaunch {
+            if ExternalPlayback.open(media) { return }
+            #if os(macOS)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
+            #else
+                playingMedia = media
+            #endif
+        }
     }
 
     // MARK: - Searching

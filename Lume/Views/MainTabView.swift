@@ -31,6 +31,9 @@ struct MainTabView: View {
     /// `onOpenURL` deep link can switch tabs and push a detail screen.
     @State private var router = DeepLinkRouter()
 
+    @State private var premium = PremiumManager.shared
+    @State private var playbackAccess = PlaybackAccessCoordinator.shared
+
     /// The stream a `lume://resume` deep link (a Live Activity tap) asked to
     /// reopen. Presented directly here, independent of any tab's own player
     /// cover.
@@ -183,6 +186,10 @@ struct MainTabView: View {
             // eleven player presentation sites: this view is the browse root,
             // so reaching it *is* the "player gone, nothing over it" condition.
             .appStoreReviewPrompt(isBlocked: hasBlockingPresentation)
+            .paywall(isPresented: playbackAccess.paywallPresented)
+            .onChange(of: premium.accessState) { _, state in
+                playbackAccess.handleAccessStateChange(state)
+            }
         #if os(tvOS)
             .overlay { tvOverlays }
         #endif
@@ -323,11 +330,13 @@ struct MainTabView: View {
             // the last played stream where it left off.
             guard NowPlayingService.shared.currentMedia == nil,
                   let media = PlaybackResumeStore.load() else { return }
-            #if os(macOS)
-                MacPlayerWindowRouter.shared.play(media, using: openWindow)
-            #else
-                resumeMedia = media
-            #endif
+            PlaybackAccessCoordinator.shared.requestLaunch {
+                #if os(macOS)
+                    MacPlayerWindowRouter.shared.play(media, using: openWindow)
+                #else
+                    resumeMedia = media
+                #endif
+            }
         case .downloads:
             // The download Live Activity was tapped.
             showsDownloads = true

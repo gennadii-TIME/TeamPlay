@@ -3,7 +3,7 @@
 //  Lume
 //
 //  TeamPlay main menu: left glass panel matching TVTeam layout — branding,
-//  profile/playlist, optional subscription line, and seven focusable rows with
+//  profile/playlist, optional Premium status line, and seven focusable rows with
 //  solid blue focus. Focus is restored via `focusedAction` when returning.
 //
 
@@ -14,7 +14,7 @@
 
     enum TVMainMenuAction: Hashable {
         case browseChannels
-        case subscription
+        case premium
         case channelSorting
         case refreshChannels
         case refreshEPG
@@ -24,8 +24,8 @@
     struct TVMainMenuView: View {
         let playlist: Playlist?
         let profileName: String?
-        /// Real subscription label only — never invented. `nil` hides the line.
-        let subscriptionLabel: String?
+        /// Trial / purchased status line. `nil` hides it (loading or expired).
+        let premiumStatusLabel: String?
         @Binding var focusedAction: TVMainMenuAction
         let onAction: (TVMainMenuAction) -> Void
 
@@ -105,8 +105,8 @@
                             .foregroundStyle(.white.opacity(0.65))
                             .lineLimit(1)
                     }
-                    if let subscriptionLabel, !subscriptionLabel.isEmpty {
-                        Text(subscriptionLabel)
+                    if let premiumStatusLabel, !premiumStatusLabel.isEmpty {
+                        Text(premiumStatusLabel)
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white.opacity(0.55))
                             .lineLimit(1)
@@ -126,10 +126,10 @@
                     icon: "tv"
                 )
                 menuRow(
-                    .subscription,
-                    title: "Subscription",
-                    subtitle: subscriptionSubtitle,
-                    icon: "shippingbox"
+                    .premium,
+                    title: "Premium",
+                    subtitle: premiumMenuSubtitle,
+                    icon: "crown"
                 )
                 menuRow(
                     .channelSorting,
@@ -156,8 +156,8 @@
             .background(.ultraThinMaterial.opacity(0.92), in: RoundedRectangle(cornerRadius: 28))
         }
 
-        private var subscriptionSubtitle: String {
-            subscriptionLabel ?? String(localized: "Package subscription")
+        private var premiumMenuSubtitle: String {
+            premiumStatusLabel ?? String(localized: "30 days free")
         }
 
         private var epgRow: some View {

@@ -35,7 +35,7 @@
             case channels
             case programGuide
             case settings
-            case subscription
+            case premium
             case sorting
         }
 
@@ -56,24 +56,16 @@
             playlists.active(for: selectedPlaylistID)
         }
 
-        /// Only show a subscription line when Premium is actually entitled with
-        /// a known product — never invent a balance or plan name.
-        private var subscriptionLabel: String? {
-            guard premium.isPremium else { return nil }
-            if let renews = premium.subscriptionStatus?.renewsAt {
-                return String(
-                    format: String(localized: "Premium · renews %@"),
-                    renews.formatted(date: .abbreviated, time: .omitted)
-                )
-            }
-            if !premium.purchasedProductIDs.isEmpty {
-                return String(localized: "TeamPlay Premium")
-            }
-            #if SIDE_LOAD
-                return String(localized: "TeamPlay Premium")
-            #else
+        /// Status under the main-menu profile line. Shown for trial / purchased;
+        /// omitted while loading or after expiry (channel playback stays open —
+        /// gating streams is a separate task).
+        private var premiumStatusLabel: String? {
+            switch premium.accessState {
+            case .trial, .purchased:
+                return PremiumAccessCopy.statusTitle(for: premium.accessState)
+            case .loading, .expired:
                 return nil
-            #endif
+            }
         }
 
         var body: some View {
@@ -85,7 +77,7 @@
                     TVMainMenuView(
                         playlist: activePlaylist,
                         profileName: profileManager?.activeProfile?.name,
-                        subscriptionLabel: subscriptionLabel,
+                        premiumStatusLabel: premiumStatusLabel,
                         focusedAction: $menuFocus,
                         onAction: handleMenu
                     )
@@ -133,7 +125,7 @@
                     } else {
                         missingPlaylist
                     }
-                case .settings, .subscription, .sorting:
+                case .settings, .premium, .sorting:
                     nestedSettings(for: route)
                 }
             }
@@ -210,7 +202,7 @@
                 switch route {
                 case .sorting:
                     ContentManagementView()
-                case .subscription:
+                case .premium:
                     SettingsView()
                 default:
                     SettingsView()
@@ -219,7 +211,7 @@
             .onExitCommand {
                 menuFocus = {
                     switch route {
-                    case .subscription: .subscription
+                    case .premium: .premium
                     case .sorting: .channelSorting
                     default: .settings
                     }
@@ -247,8 +239,8 @@
             switch action {
             case .browseChannels:
                 route = .channels
-            case .subscription:
-                route = .subscription
+            case .premium:
+                route = .premium
             case .channelSorting:
                 route = .sorting
             case .refreshChannels:
@@ -270,24 +262,36 @@
             // Avoid stacking multiple full-screen players on repeated Select.
             if playingMedia?.id == media.id { return }
             if playingMedia != nil {
+                // In-session swap — do not re-enter the access gate.
                 playingMedia = media
                 return
             }
 
-            if media.isCatchup,
-               let position = TVArchiveResumeStore.position(forCatchupID: media.id),
-               position > 5
+            let start: @MainActor () -> Void = {
+                if media.isCatchup,
+                   let position = TVArchiveResumeStore.position(forCatchupID: media.id),
+                   position > 5
+                {
+                    pendingResume = PendingResume(
+                        id: media.id,
+                        media: media,
+                        position: position,
+                        channelName: media.title,
+                        programTitle: media.subtitle ?? media.title
+                    )
+                    return
+                }
+                playingMedia = media
+            }
+
+            if PlaybackAccessCoordinator.allowsScreenshotBypass,
+               CommandLine.arguments.contains("-tp-route")
             {
-                pendingResume = PendingResume(
-                    id: media.id,
-                    media: media,
-                    position: position,
-                    channelName: media.title,
-                    programTitle: media.subtitle ?? media.title
-                )
+                start()
                 return
             }
-            playingMedia = media
+
+            PlaybackAccessCoordinator.shared.requestLaunch(perform: start)
         }
 
         private func playLive(for catchupMedia: PlayableMedia) {
@@ -300,6 +304,7 @@
                   let live = PlayableMedia.from(stream: stream, playlist: playlist)
             else { return }
             TVArchiveResumeStore.clear(catchupID: catchupMedia.id)
+            // Same session (Go Live from resume overlay) — no gate.
             playingMedia = live
         }
 
@@ -322,6 +327,7 @@
         }
 
         private func seedPlaybackForScreenshot(archive: Bool) {
+            guard PlaybackAccessCoordinator.allowsScreenshotBypass else { return }
             guard let playlist = activePlaylist else { return }
             let prefix = playlist.id.uuidString
             var descriptor = FetchDescriptor<LiveStream>(

@@ -370,14 +370,14 @@
                 pendingMedia = media
                 selectedFixture = nil
             } else {
-                playingMedia = media
+                PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
             }
         }
 
         private func presentPendingMedia() {
             guard let media = pendingMedia else { return }
             pendingMedia = nil
-            playingMedia = media
+            PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
         }
     }
 
