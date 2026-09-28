@@ -17,8 +17,7 @@ struct PremiumPlanTests {
 
     @Test func `only lifetime is purchasable`() {
         #expect(PremiumManager.Plan.purchasable == [.lifetime])
-        #expect(!PremiumManager.Plan.purchasable.contains(.monthly))
-        #expect(!PremiumManager.Plan.purchasable.contains(.retiredMonthly))
+        #expect(PremiumManager.Plan.allCases == [.lifetime])
     }
 
     @Test func `nothing is renewable`() {
@@ -26,11 +25,13 @@ struct PremiumPlanTests {
         #expect(!PremiumManager.Plan.lifetime.isRenewable)
     }
 
-    @Test func `legacy bilipp ids are not in the working contract`() {
+    @Test func `legacy bilipp and monthly ids are not in the working contract`() {
         let ids = Set(PremiumManager.Plan.allCases.map(\.rawValue))
+        #expect(ids == ["time.teamplay.premium.lifetime"])
+        #expect(!ids.contains("time.teamplay.premium.monthly"))
+        #expect(!ids.contains("time.teamplay.premium.monthly.retired"))
         #expect(!ids.contains("com.bilipp.lume.pro.monthly"))
         #expect(!ids.contains("com.bilipp.lume.premium.lifetime"))
         #expect(!ids.contains("com.bilipp.lume.premium.monthly"))
-        #expect(ids.contains("time.teamplay.premium.lifetime"))
     }
 }

@@ -105,8 +105,6 @@ struct PremiumManagerAccessTests {
         #expect(manager.accessState == .expired)
         #expect(!manager.hasFullAccess)
         #expect(manager.purchasedProductIDs.isEmpty)
-        #expect(!manager.hasManageableSubscription)
-        #expect(manager.subscriptionStatus == nil)
     }
 
     @Test func `clock rollback after expiry does not restore trial`() async {

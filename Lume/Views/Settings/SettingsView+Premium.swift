@@ -2,12 +2,12 @@
 //  SettingsView+Premium.swift
 //  Lume
 //
-//  The TeamPlay Premium surfaces in Settings: the shared paywall helpers, the
-//  status / upgrade row that sits first in the iOS/macOS list, the DEBUG-only
-//  developer override, and the tvOS Premium pane. Split out of SettingsView to
-//  keep that file within the project's line-count cap.
+//  TeamPlay Premium surfaces in Settings: status for trial / purchased / expired /
+//  loading, early lifetime purchase during trial, the DEBUG override, and the
+//  tvOS Premium pane. Split out of SettingsView to keep that file within the line cap.
 //
 
+import StoreKit
 import SwiftUI
 
 extension SettingsView {
@@ -17,80 +17,73 @@ extension SettingsView {
         showPaywall = true
     }
 
-    /// Whether a new playlist can be added for free (first playlist always free).
+    /// Whether a new playlist can be added (first playlist always free; trial and
+    /// lifetime both count as full access).
     var canAddPlaylist: Bool {
-        premium.isPremium || playlists.isEmpty
+        premium.hasFullAccess || playlists.isEmpty
     }
 
-    /// Which plan is unlocking Premium — the headline of the status row.
-    var premiumPlanTitle: String {
-        #if !SIDE_LOAD
-            // A lifetime unlock outranks a subscription: it can't lapse, so that's the
-            // more useful thing to show if someone somehow holds both. The retired
-            // non-consumable is lifetime access too — it just never renewed.
-            if premium.owns(.lifetime) || premium.owns(.retiredMonthly) {
-                return String(localized: "Lifetime access")
-            }
-            if premium.owns(.monthly) { return String(localized: "Monthly subscription") }
-        #endif
-        return String(localized: "All features unlocked")
-    }
-
-    /// Billing line under the plan title: the next charge date, the cut-off date once
-    /// cancelled, or a prompt to fix a failed payment. Nil for anything that doesn't
-    /// renew, so lifetime owners never see a billing date.
-    var premiumRenewalDetail: String? {
-        guard premium.owns(.monthly), let status = premium.subscriptionStatus else { return nil }
-        if status.isInBillingRetry {
-            return String(localized: "Payment issue — update your payment method")
+    /// Label for the early-purchase / expired unlock button, preferring the live
+    /// StoreKit price when the lifetime product is already loaded.
+    var buyForeverButtonTitle: String {
+        if let price = premium.product(for: .lifetime)?.displayPrice {
+            return PremiumAccessCopy.buyForeverTitle(displayPrice: price)
         }
-        guard let renewsAt = status.renewsAt else { return nil }
-        let date = renewsAt.formatted(date: .abbreviated, time: .omitted)
-        let format = status.willAutoRenew
-            ? String(localized: "Renews %@")
-            : String(localized: "Ends %@")
-        return String(format: format, date)
-    }
-
-    /// Plan and billing state on one line, for the tvOS pane's single subtitle slot.
-    var premiumStatusDetail: String {
-        guard let detail = premiumRenewalDetail else { return premiumPlanTitle }
-        return "\(premiumPlanTitle) · \(detail)"
+        return String(localized: "Buy Forever")
     }
 }
 
 #if !os(tvOS)
 
     extension SettingsView {
-        /// The first row in Settings: current Premium status, or a tap-to-upgrade
-        /// prompt for free users.
+        /// The first row in Settings: trial / purchased status, a loading
+        /// indicator, or a tap-to-upgrade prompt once the trial has ended.
+        /// During an active trial the user keeps full access and can still open
+        /// the lifetime purchase UI.
         var premiumStatusSection: some View {
             Section {
-                if premium.isPremium {
+                switch premium.accessState {
+                case .loading:
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .frame(width: 30)
+                        Text(PremiumAccessCopy.statusTitle(for: .loading))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+
+                case .purchased:
                     HStack(spacing: 12) {
                         Image(systemName: "crown")
                             .foregroundStyle(.tint)
                             .font(.title3)
                             .frame(width: 30)
-                        VStack(alignment: .leading, spacing: 1) {
-                            // The plan, not the product name — the section header
-                            // already says "TeamPlay Premium".
-                            Text(premiumPlanTitle)
-                            if let premiumRenewalDetail {
-                                Text(premiumRenewalDetail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        Text(PremiumAccessCopy.statusTitle(for: .purchased))
                     }
                     .padding(.vertical, 2)
 
-                    // Subscribers must always have a route to cancel; lifetime owners
-                    // have nothing to manage, so they don't get this row.
-                    if premium.hasManageableSubscription {
-                        ManageSubscriptionRow()
+                case .trial:
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "crown")
+                                .foregroundStyle(.tint)
+                                .font(.title3)
+                                .frame(width: 30)
+                            Text(PremiumAccessCopy.statusTitle(for: premium.accessState))
+                        }
+
+                        Button {
+                            presentPaywall(nil)
+                        } label: {
+                            Text(buyForeverButtonTitle)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
                     }
-                } else {
+                    .padding(.vertical, 2)
+
+                case .expired:
                     Button {
                         presentPaywall(nil)
                     } label: {
@@ -100,9 +93,9 @@ extension SettingsView {
                                 .font(.title3)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Unlock TeamPlay Premium")
+                                Text(PremiumAccessCopy.statusTitle(for: .expired))
                                     .foregroundStyle(.primary)
-                                Text("Free plan · See what's included")
+                                Text(buyForeverButtonTitle)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -115,10 +108,12 @@ extension SettingsView {
                     }
                 }
             } header: {
-                // Not "Subscription" — lifetime owners see this section too, and
-                // labelling a one-time purchase a subscription is what sent people
-                // hunting for a cancel button that couldn't exist.
                 Text("TeamPlay Premium")
+            }
+            .task {
+                if premium.product(for: .lifetime) == nil {
+                    await premium.loadProducts()
+                }
             }
         }
 
@@ -150,26 +145,30 @@ extension SettingsView {
 #if os(tvOS)
 
     extension SettingsView {
-        /// The tvOS Premium pane: status, the full benefits list, and upgrade /
-        /// restore actions for free users.
+        /// The tvOS Premium pane: status, benefits, early buy during trial, and
+        /// upgrade / restore when expired.
         var tvPremiumDetail: some View {
             VStack(alignment: .leading, spacing: 28) {
                 VStack(alignment: .leading, spacing: 8) {
                     TVSettingsSectionLabel("Premium")
 
                     HStack(spacing: 18) {
-                        Image(systemName: "crown")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.tint)
-                            .frame(width: 60, height: 60)
-                            .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
+                        Group {
+                            if case .loading = premium.accessState {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "crown")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(.tint)
+                            }
+                        }
+                        .frame(width: 60, height: 60)
+                        .background(.tint.opacity(0.12), in: .rect(cornerRadius: 14, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(premium.isPremium ? "TeamPlay Premium" : "Free Plan")
+                            Text("TeamPlay Premium")
                                 .font(.system(size: 26, weight: .semibold))
-                            Text(premium.isPremium
-                                ? premiumStatusDetail
-                                : String(localized: "Upgrade to unlock the features below"))
+                            Text(tvPremiumSubtitle)
                                 .font(.system(size: 20))
                                 .foregroundStyle(.secondary)
                         }
@@ -180,7 +179,7 @@ extension SettingsView {
                 }
 
                 VStack(alignment: .leading, spacing: 16) {
-                    TVSettingsSectionLabel(premium.isPremium ? "Included" : "Premium Features")
+                    TVSettingsSectionLabel(premium.hasFullAccess ? "Included" : "Premium Features")
                     ForEach(PremiumFeature.allCases) { feature in
                         HStack(alignment: .top, spacing: 18) {
                             Image(systemName: feature.systemImage)
@@ -199,19 +198,14 @@ extension SettingsView {
                     }
                 }
 
-                if premium.hasManageableSubscription {
-                    ManageSubscriptionRow()
-                        .padding(.horizontal, TVSettingsMetrics.rowHPadding)
-                }
-
-                if !premium.isPremium {
+                if PremiumPaywallPolicy.allowsLifetimePurchaseUI(for: premium.accessState) {
                     Button {
                         presentPaywall(nil)
                     } label: {
                         HStack(spacing: 16) {
                             Image(systemName: "crown")
                                 .font(.system(size: 22, weight: .medium))
-                            Text("Upgrade to Premium")
+                            Text(buyForeverButtonTitle)
                             Spacer(minLength: 0)
                         }
                     }
@@ -230,6 +224,15 @@ extension SettingsView {
                     .buttonStyle(TVSettingsRowButtonStyle())
                 }
             }
+            .task {
+                if premium.product(for: .lifetime) == nil {
+                    await premium.loadProducts()
+                }
+            }
+        }
+
+        private var tvPremiumSubtitle: String {
+            PremiumAccessCopy.statusTitle(for: premium.accessState)
         }
     }
 

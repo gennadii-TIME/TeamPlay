@@ -2,10 +2,9 @@
 //  PaywallView.swift
 //  Lume
 //
-//  The TeamPlay Premium paywall: benefits list + the two plans (monthly subscription,
-//  one-time lifetime). Presented as a sheet whenever a free user reaches a gated
-//  feature, and from the Premium status row in Settings. Never shown in sideloaded
-//  builds (those are always Premium).
+//  TeamPlay Premium paywall: 30-day free trial framing + a single lifetime
+//  non-consumable. No subscriptions, no auto-renewal copy. Presented as a sheet
+//  when a gated feature is hit or from Settings. Never shown in sideloaded builds.
 //
 
 import OSLog
@@ -18,35 +17,59 @@ struct PaywallView: View {
     var highlight: PremiumFeature?
 
     @State private var premium = PremiumManager.shared
+    @State private var lifetimeProduct: Product?
+    @State private var isLoadingProducts = true
+    @State private var productsFailed = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
     #if !os(tvOS)
-        /// Drives the system offer-code redemption sheet. Offer codes let users
-        /// unlock Pro with a coupon issued in App Store Connect. The redeemed
-        /// transaction also arrives via `Transaction.updates`, but we refresh on
-        /// completion so the paywall dismisses immediately. tvOS has no in-app
-        /// sheet — those users redeem in the App Store.
+        /// Offer-code redemption (iOS / macOS). tvOS redeems in the App Store app.
         @State private var showRedeemCode = false
     #endif
 
-    /// Apple's standard EULA, plus TeamPlay's privacy placeholder. Subscriptions must link
-    /// to terms of use and a privacy policy on the purchase screen.
     private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
     private static let privacyURL = URL(string: "https://github.com/gennadii-TIME/TeamPlay/blob/main/docs/RELEASE_COMPLIANCE.md")!
 
     var body: some View {
         #if os(tvOS)
             tvBody
+                .task { await reloadProducts() }
+                .onChange(of: premium.accessState) { _, state in
+                    if PremiumPaywallPolicy.shouldAutoDismiss(for: state) {
+                        dismiss()
+                    }
+                }
         #else
             standardBody
+                .task { await reloadProducts() }
+                .onChange(of: premium.accessState) { _, state in
+                    if PremiumPaywallPolicy.shouldAutoDismiss(for: state) {
+                        dismiss()
+                    }
+                }
         #endif
     }
 
-    /// The features shown as benefits — the highlighted one first, if any.
     private var orderedFeatures: [PremiumFeature] {
         guard let highlight else { return PremiumFeature.allCases }
         return [highlight] + PremiumFeature.allCases.filter { $0 != highlight }
+    }
+
+    private func reloadProducts() async {
+        isLoadingProducts = true
+        productsFailed = false
+        await premium.loadProducts()
+        lifetimeProduct = premium.product(for: .lifetime)
+        productsFailed = lifetimeProduct == nil
+        isLoadingProducts = false
+    }
+
+    /// Purchase via PremiumManager. Cancelled / pending / failed results return
+    /// false and leave entitlements unchanged — the paywall stays up and access
+    /// is not granted.
+    private func buy(_ product: Product) async {
+        _ = await premium.purchase(product)
     }
 
     // MARK: - iOS / macOS
@@ -58,7 +81,7 @@ struct PaywallView: View {
                     VStack(spacing: 28) {
                         header
                         benefitsList
-                        planButtons
+                        purchaseSection
                         redeemButton
                         legalFooter
                     }
@@ -76,14 +99,11 @@ struct PaywallView: View {
                             Button("Close") { dismiss() }
                         }
                         ToolbarItem(placement: .primaryAction) {
-                            Button("Restore") {
+                            Button("Restore Purchases") {
                                 Task { await premium.restore() }
                             }
                             .disabled(premium.isWorking)
                         }
-                    }
-                    .onChange(of: premium.isPremium) { _, isPremium in
-                        if isPremium { dismiss() }
                     }
                     .offerCodeRedemption(isPresented: $showRedeemCode) { result in
                         if case let .failure(error) = result {
@@ -112,10 +132,13 @@ struct PaywallView: View {
                 Image(systemName: "crown")
                     .font(.system(size: 44))
                     .foregroundStyle(.tint)
-                Text("Unlock TeamPlay Premium")
+                Text("TeamPlay Premium")
                     .font(.title.bold())
                     .multilineTextAlignment(.center)
-                Text("Lume is free and open source. Pro supports development and unlocks a few extra conveniences.")
+                Text(paywallHeadline)
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                Text("One-time purchase. No subscription and no automatic billing.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -143,37 +166,54 @@ struct PaywallView: View {
         }
 
         @ViewBuilder
-        private var planButtons: some View {
-            if premium.products.isEmpty {
-                ProgressView().padding(.vertical, 12)
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(premium.products, id: \.id) { product in
-                        Button {
-                            Task { await premium.purchase(product) }
-                        } label: {
-                            planLabel(for: product)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .disabled(premium.isWorking)
+        private var purchaseSection: some View {
+            VStack(spacing: 12) {
+                if isLoadingProducts {
+                    ProgressView()
+                        .padding(.vertical, 12)
+                } else if productsFailed || lifetimeProduct == nil {
+                    Text("Couldn’t load the price. Check your connection and try again.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Try Again") {
+                        Task { await reloadProducts() }
                     }
+                    .buttonStyle(.bordered)
+                } else if let product = lifetimeProduct {
+                    Button {
+                        Task { await buy(product) }
+                    } label: {
+                        if premium.isWorking {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Text(PremiumAccessCopy.buyForeverTitle(displayPrice: product.displayPrice))
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(premium.isWorking)
                 }
             }
         }
 
-        private func planLabel(for product: Product) -> some View {
-            HStack {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(planTitle(for: product)).fontWeight(.semibold)
-                    if let caption = planCaption(for: product) {
-                        Text(caption).font(.caption).opacity(0.9)
-                    }
+        private var legalFooter: some View {
+            VStack(spacing: 8) {
+                Text("Payment is charged to your Apple Account. This is a one-time purchase — nothing renews and there is nothing to cancel.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                HStack(spacing: 16) {
+                    Button("Terms of Use") { openURL(Self.termsURL) }
+                    Button("Privacy Policy") { openURL(Self.privacyURL) }
                 }
-                Spacer()
-                Text(product.displayPrice).fontWeight(.semibold)
+                .font(.caption2)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
             }
-            .frame(maxWidth: .infinity)
         }
     #endif
 
@@ -189,7 +229,9 @@ struct PaywallView: View {
                             .foregroundStyle(.tint)
                         Text("TeamPlay Premium")
                             .font(.system(size: 48, weight: .bold))
-                        Text("Lume is free and open source. Pro supports development and unlocks a few extra conveniences.")
+                        Text(paywallHeadline)
+                            .font(.system(size: 32, weight: .semibold))
+                        Text("One-time purchase. No subscription and no automatic billing.")
                             .font(.system(size: 24))
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: 560, alignment: .leading)
@@ -215,30 +257,7 @@ struct PaywallView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     VStack(spacing: 20) {
-                        if premium.products.isEmpty {
-                            ProgressView()
-                        } else {
-                            ForEach(premium.products, id: \.id) { product in
-                                Button {
-                                    Task { await premium.purchase(product) }
-                                } label: {
-                                    VStack(spacing: 4) {
-                                        Text(planTitle(for: product))
-                                            .font(.system(size: 26, weight: .semibold))
-                                        Text(product.displayPrice)
-                                            .font(.system(size: 22))
-                                        if let caption = planCaption(for: product) {
-                                            Text(caption)
-                                                .font(.system(size: 18))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                }
-                                .disabled(premium.isWorking)
-                            }
-                        }
+                        tvPurchaseSection
 
                         Button("Restore Purchases") {
                             Task { await premium.restore() }
@@ -251,67 +270,103 @@ struct PaywallView: View {
                 }
                 .padding(80)
             }
-            .onChange(of: premium.isPremium) { _, isPremium in
-                if isPremium { dismiss() }
+        }
+
+        @ViewBuilder
+        private var tvPurchaseSection: some View {
+            if isLoadingProducts {
+                ProgressView()
+            } else if productsFailed || lifetimeProduct == nil {
+                Text("Couldn’t load the price. Check your connection and try again.")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Try Again") {
+                    Task { await reloadProducts() }
+                }
+            } else if let product = lifetimeProduct {
+                Button {
+                    Task { await buy(product) }
+                } label: {
+                    Group {
+                        if premium.isWorking {
+                            ProgressView()
+                        } else {
+                            Text(PremiumAccessCopy.buyForeverTitle(displayPrice: product.displayPrice))
+                                .font(.system(size: 26, weight: .semibold))
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .disabled(premium.isWorking)
             }
         }
     #endif
 
-    // MARK: - Plan copy
+    /// Headline under the title: remaining trial days when still in trial,
+    /// otherwise the generic free-period line for expired / loading.
+    private var paywallHeadline: String {
+        if case .trial = premium.accessState {
+            return PremiumAccessCopy.statusTitle(for: premium.accessState)
+        }
+        if case .expired = premium.accessState {
+            return PremiumAccessCopy.statusTitle(for: .expired)
+        }
+        return String(localized: "30 days free")
+    }
+}
 
-    private func planTitle(for product: Product) -> String {
-        switch product.id {
-        case PremiumManager.Plan.lifetime.rawValue: String(localized: "Lifetime")
-        case PremiumManager.Plan.monthly.rawValue: String(localized: "Monthly")
-        default: product.displayName
+// MARK: - Paywall presentation policy
+
+/// Pure rules for when the paywall may stay open during trial and when it must
+/// dismiss after a successful lifetime unlock.
+enum PremiumPaywallPolicy {
+    /// Auto-dismiss only after a verified lifetime purchase — never merely
+    /// because the user still has an active trial (`hasFullAccess` alone).
+    static func shouldAutoDismiss(for state: PremiumAccessState) -> Bool {
+        if case .purchased = state { return true }
+        return false
+    }
+
+    /// Trial and expired users can open the lifetime purchase UI. Purchased
+    /// users have nothing left to buy; loading has no resolved offer yet.
+    static func allowsLifetimePurchaseUI(for state: PremiumAccessState) -> Bool {
+        switch state {
+        case .trial, .expired:
+            return true
+        case .loading, .purchased:
+            return false
+        }
+    }
+}
+
+// MARK: - Shared status copy (Settings + tvOS shell)
+
+enum PremiumAccessCopy {
+    /// Days left in an active trial, always ≥ 1 while the trial state is active.
+    static func daysRemaining(until end: Date, now: Date = Date()) -> Int {
+        let seconds = end.timeIntervalSince(now)
+        guard seconds > 0 else { return 0 }
+        return max(1, Int((seconds / (24 * 60 * 60)).rounded(.up)))
+    }
+
+    static func statusTitle(for state: PremiumAccessState, now: Date = Date()) -> String {
+        switch state {
+        case .loading:
+            return String(localized: "Checking access…")
+        case let .trial(until):
+            let days = daysRemaining(until: until, now: now)
+            return String(localized: "Trial — \(days) days left")
+        case .purchased:
+            return String(localized: "Full version purchased")
+        case .expired:
+            return String(localized: "Trial ended")
         }
     }
 
-    /// Derived from StoreKit rather than the product ID, so the renewal wording can
-    /// only ever say "billed monthly" about something the App Store will actually
-    /// bill monthly.
-    private func planCaption(for product: Product) -> String? {
-        guard let period = product.subscription?.subscriptionPeriod else {
-            return String(localized: "One-time purchase")
-        }
-        switch (period.unit, period.value) {
-        case (.month, 1): return String(localized: "Billed monthly, cancel anytime")
-        case (.year, 1): return String(localized: "Billed yearly, cancel anytime")
-        default: return String(localized: "Cancel anytime")
-        }
+    static func buyForeverTitle(displayPrice: String) -> String {
+        String(localized: "Buy Forever — \(displayPrice)")
     }
-
-    /// True when an auto-renewable product is on sale — the only case in which the
-    /// subscription terms in the footer apply.
-    private var offersSubscription: Bool {
-        premium.products.contains { $0.subscription != nil }
-    }
-
-    #if !os(tvOS)
-        private var legalFooter: some View {
-            VStack(spacing: 8) {
-                // Describe only what is actually on sale. Printing the auto-renewal
-                // terms next to a one-time purchase is what made buyers go looking for
-                // a cancel button in the App Store that could not exist — so the
-                // renewal sentence is gated on a renewable product being loaded, and
-                // while nothing is loaded we state no terms at all.
-                if !premium.products.isEmpty {
-                    Text(offersSubscription
-                        // swiftlint:disable:next line_length
-                        ? "Payment is charged to your Apple Account. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period. Manage or cancel in your Apple Account settings."
-                        : "Payment is charged to your Apple Account. This is a one-time purchase — nothing renews and there is nothing to cancel.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                HStack(spacing: 16) {
-                    Button("Terms of Use") { openURL(Self.termsURL) }
-                    Button("Privacy Policy") { openURL(Self.privacyURL) }
-                }
-                .font(.caption2)
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-            }
-        }
-    #endif
 }

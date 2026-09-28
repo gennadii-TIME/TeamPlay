@@ -187,11 +187,6 @@ final class PremiumManager {
     enum Plan: String, CaseIterable {
         case lifetime = "time.teamplay.premium.lifetime"
 
-        /// Compile shims for existing UI that still switches on these cases.
-        /// Not loaded, not sold, never entitled — removed from the working contract.
-        case monthly = "time.teamplay.premium.monthly"
-        case retiredMonthly = "time.teamplay.premium.monthly.retired"
-
         /// The plans the paywall may offer.
         static let purchasable: [Plan] = [.lifetime]
 
@@ -199,20 +194,10 @@ final class PremiumManager {
         var isRenewable: Bool { false }
     }
 
-    /// Retained so Settings / tvOS shell still compile; always nil — there is no
-    /// subscription to describe.
-    nonisolated struct SubscriptionStatus: Equatable {
-        var willAutoRenew: Bool
-        var renewsAt: Date?
-        var isInBillingRetry: Bool
-    }
-
     /// Loaded `Product`s for the purchasable plans.
     private(set) var products: [Product] = []
     /// Product IDs the user currently owns (lifetime only in the working model).
     private(set) var purchasedProductIDs: Set<String> = []
-    /// Always nil — subscriptions are gone.
-    private(set) var subscriptionStatus: SubscriptionStatus?
     /// True while a purchase or restore is in flight.
     private(set) var isWorking = false
     /// Latest resolved access state.
@@ -297,9 +282,6 @@ final class PremiumManager {
         plan == .lifetime && purchasedProductIDs.contains(Plan.lifetime.rawValue)
     }
 
-    /// Always false — nothing renewable is on sale.
-    var hasManageableSubscription: Bool { false }
-
     // MARK: - StoreKit
 
     func loadProducts() async {
@@ -375,14 +357,12 @@ final class PremiumManager {
         #if SIDE_LOAD
             purchasedProductIDs = [Plan.lifetime.rawValue]
             accessState = .purchased
-            subscriptionStatus = nil
             return
         #else
             let entitled = await dependencies.fetchEntitledProductIDs()
             // Working contract: only the lifetime non-consumable grants purchase.
             let lifetimeOwned = entitled.contains(Plan.lifetime.rawValue)
             purchasedProductIDs = lifetimeOwned ? [Plan.lifetime.rawValue] : []
-            subscriptionStatus = nil
 
             let original = await dependencies.fetchOriginalPurchaseDate()
             let rawNow = dependencies.now()
@@ -422,7 +402,6 @@ final class PremiumManager {
                 hasLifetimeEntitlement: hasLifetimeEntitlement
             )
         )
-        subscriptionStatus = nil
     }
 
     private func handle(_ result: VerificationResult<Transaction>) async {
