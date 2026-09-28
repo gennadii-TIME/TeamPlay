@@ -374,12 +374,14 @@ struct MovieDetailView: View {
     private func startPlayback() {
         guard let playlist = moviePlaylist,
               let media = PlayableMedia.from(movie: movie, playlist: playlist) else { return }
-        if ExternalPlayback.open(media) { return }
-        #if os(macOS)
-            MacPlayerWindowRouter.shared.play(media, using: openWindow)
-        #else
-            playingMedia = media
-        #endif
+        PlaybackAccessCoordinator.shared.requestLaunch {
+            if ExternalPlayback.open(media) { return }
+            #if os(macOS)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
+            #else
+                playingMedia = media
+            #endif
+        }
     }
 
     private func openTrailer(_ trailer: String) {

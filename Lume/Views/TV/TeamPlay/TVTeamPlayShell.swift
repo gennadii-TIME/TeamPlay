@@ -262,24 +262,36 @@
             // Avoid stacking multiple full-screen players on repeated Select.
             if playingMedia?.id == media.id { return }
             if playingMedia != nil {
+                // In-session swap — do not re-enter the access gate.
                 playingMedia = media
                 return
             }
 
-            if media.isCatchup,
-               let position = TVArchiveResumeStore.position(forCatchupID: media.id),
-               position > 5
+            let start: @MainActor () -> Void = {
+                if media.isCatchup,
+                   let position = TVArchiveResumeStore.position(forCatchupID: media.id),
+                   position > 5
+                {
+                    pendingResume = PendingResume(
+                        id: media.id,
+                        media: media,
+                        position: position,
+                        channelName: media.title,
+                        programTitle: media.subtitle ?? media.title
+                    )
+                    return
+                }
+                playingMedia = media
+            }
+
+            if PlaybackAccessCoordinator.allowsScreenshotBypass,
+               CommandLine.arguments.contains("-tp-route")
             {
-                pendingResume = PendingResume(
-                    id: media.id,
-                    media: media,
-                    position: position,
-                    channelName: media.title,
-                    programTitle: media.subtitle ?? media.title
-                )
+                start()
                 return
             }
-            playingMedia = media
+
+            PlaybackAccessCoordinator.shared.requestLaunch(perform: start)
         }
 
         private func playLive(for catchupMedia: PlayableMedia) {
@@ -292,6 +304,7 @@
                   let live = PlayableMedia.from(stream: stream, playlist: playlist)
             else { return }
             TVArchiveResumeStore.clear(catchupID: catchupMedia.id)
+            // Same session (Go Live from resume overlay) — no gate.
             playingMedia = live
         }
 
@@ -314,6 +327,7 @@
         }
 
         private func seedPlaybackForScreenshot(archive: Bool) {
+            guard PlaybackAccessCoordinator.allowsScreenshotBypass else { return }
             guard let playlist = activePlaylist else { return }
             let prefix = playlist.id.uuidString
             var descriptor = FetchDescriptor<LiveStream>(

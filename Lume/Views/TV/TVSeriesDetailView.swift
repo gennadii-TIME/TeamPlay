@@ -479,8 +479,10 @@
         func playEpisode(_ episode: Episode) {
             guard let playlist = seriesPlaylist,
                   let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
-            if ExternalPlayback.open(media) { return }
-            playingMedia = media
+            PlaybackAccessCoordinator.shared.requestLaunch {
+                if ExternalPlayback.open(media) { return }
+                playingMedia = media
+            }
         }
 
         func toggleFavorite() {

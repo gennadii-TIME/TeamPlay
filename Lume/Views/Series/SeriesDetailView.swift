@@ -530,12 +530,14 @@ private extension SeriesDetailView {
     func playEpisode(_ episode: Episode) {
         guard let playlist = seriesPlaylist,
               let media = PlayableMedia.from(episode: episode, playlist: playlist) else { return }
-        if ExternalPlayback.open(media) { return }
-        #if os(macOS)
-            MacPlayerWindowRouter.shared.play(media, using: openWindow)
-        #else
-            playingMedia = media
-        #endif
+        PlaybackAccessCoordinator.shared.requestLaunch {
+            if ExternalPlayback.open(media) { return }
+            #if os(macOS)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
+            #else
+                playingMedia = media
+            #endif
+        }
     }
 
     func toggleFavorite() {

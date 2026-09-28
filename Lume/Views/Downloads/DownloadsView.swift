@@ -134,7 +134,7 @@ import SwiftUI
         private func play(movie: Movie) {
             // Try local file first, then fall back to streaming via the playlist
             if let path = movie.localFileURL, FileManager.default.fileExists(atPath: path) {
-                playingMedia = PlayableMedia(
+                let media = PlayableMedia(
                     id: "movie-\(movie.id)",
                     url: URL(fileURLWithPath: path),
                     title: movie.name,
@@ -144,18 +144,19 @@ import SwiftUI
                     startTime: movie.watchProgress,
                     contentRef: .movie(movie.id)
                 )
+                PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
                 return
             }
             guard let playlist = playlists.first(where: { movie.id.hasPrefix($0.id.uuidString) }) ?? playlists.first,
                   let media = PlayableMedia.from(movie: movie, playlist: playlist)
             else { return }
-            playingMedia = media
+            PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
         }
 
         private func play(episode: Episode) {
             if let path = episode.localFileURL, FileManager.default.fileExists(atPath: path) {
                 let seriesName = episode.series?.name
-                playingMedia = PlayableMedia(
+                let media = PlayableMedia(
                     id: "episode-\(episode.id)",
                     url: URL(fileURLWithPath: path),
                     title: seriesName ?? episode.title,
@@ -165,13 +166,14 @@ import SwiftUI
                     startTime: episode.watchProgress,
                     contentRef: .episode(episode.id)
                 )
+                PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
                 return
             }
             guard let series = episode.series,
                   let playlist = playlists.first(where: { series.id.hasPrefix($0.id.uuidString) }) ?? playlists.first,
                   let media = PlayableMedia.from(episode: episode, playlist: playlist)
             else { return }
-            playingMedia = media
+            PlaybackAccessCoordinator.shared.requestLaunch { playingMedia = media }
         }
     }
 

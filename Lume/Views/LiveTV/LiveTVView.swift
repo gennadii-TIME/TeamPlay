@@ -402,12 +402,14 @@ struct LiveTVView: View {
     }
 
     private func present(_ media: PlayableMedia) {
-        if ExternalPlayback.open(media) { return }
-        #if os(macOS)
-            MacPlayerWindowRouter.shared.play(media, using: openWindow)
-        #else
-            playingMedia = media
-        #endif
+        PlaybackAccessCoordinator.shared.requestLaunch {
+            if ExternalPlayback.open(media) { return }
+            #if os(macOS)
+                MacPlayerWindowRouter.shared.play(media, using: openWindow)
+            #else
+                playingMedia = media
+            #endif
+        }
     }
 }
 
