@@ -29,7 +29,7 @@ struct PaywallView: View {
     #endif
 
     private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    private static let privacyURL = URL(string: "https://github.com/gennadii-TIME/TeamPlay/blob/main/docs/RELEASE_COMPLIANCE.md")!
+    private static let privacyURL = SupportInfo.privacyPolicyURL!
 
     var body: some View {
         #if os(tvOS)

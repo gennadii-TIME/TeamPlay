@@ -17,6 +17,10 @@ nonisolated enum SupportInfo {
     static let website = "https://github.com/gennadii-TIME/TeamPlay"
     static let email = "support@tinika.lv"
 
+    /// Public privacy policy. Source of truth in-repo: `docs/PRIVACY.md` (+ `docs/privacy.html`).
+    /// Gist URL is used so App Store / paywall always hit a live public page (tinika.lv/teamplay/privacy is 404).
+    static let privacyPolicy = "https://gist.github.com/gennadii-TIME/d89f0aa030eb0c076a53f072de93817e"
+
     /// App Store listing placeholders until TeamPlay ships its own listing.
     static let appStore = "https://github.com/gennadii-TIME/TeamPlay"
     static let appStoreReview = "https://github.com/gennadii-TIME/TeamPlay"
@@ -27,6 +31,10 @@ nonisolated enum SupportInfo {
 
     static var websiteURL: URL? {
         URL(string: website)
+    }
+
+    static var privacyPolicyURL: URL? {
+        URL(string: privacyPolicy)
     }
 
     static var emailURL: URL? {
