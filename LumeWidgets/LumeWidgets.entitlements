@@ -2,9 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.time.teamplay.app</string>
-	</array>
+	<!-- No App Group for the first App Store upload. Live Activity UI still
+	     renders content-state text; shared artwork is skipped when the
+	     container is unavailable (see PlaybackActivityArtworkStore). -->
 </dict>
 </plist>

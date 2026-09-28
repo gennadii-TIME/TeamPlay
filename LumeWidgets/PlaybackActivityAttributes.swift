@@ -39,9 +39,11 @@
     }
 
     /// The app writes a downscaled artwork copy here; the widget extension
-    /// reads it back. Both sides resolve the same app-group container.
+    /// reads it back. Both sides resolve the same app-group container when
+    /// App Groups are re-enabled in entitlements (omitted for the first
+    /// App Store upload — `directoryURL` is then nil and artwork is skipped).
     nonisolated enum PlaybackActivityArtworkStore {
-        static let appGroupID = "group.time.teamplay.app"
+        static let appGroupID = "group.lv.tinika.teamplay"
         static let directoryName = "LiveActivityArtwork"
 
         static var directoryURL: URL? {
